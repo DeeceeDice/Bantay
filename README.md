@@ -75,11 +75,17 @@ an English / Filipino toggle that translates the whole interface.
 **No API keys are required.** The map is a self-contained tile renderer
 ([`lib/core/map/`](lib/core/map/)) drawing OpenStreetMap tiles — not an
 embedded vendor SDK. Clone the repo, run it, and you have a working map with
-no billing account and no key to configure. Before a wide public launch you
-should point it at your own tile provider: the public OpenStreetMap servers run
-on donated infrastructure and their usage policy is not suitable for a
-high-traffic app. That is a one-line change in
-[`map_tile_source.dart`](lib/core/map/map_tile_source.dart).
+no billing account and no key to configure.
+
+**Swap the tile source before you distribute the app to real users.** The
+default points at the OpenStreetMap Foundation's volunteer-run tile servers,
+and [their usage policy](https://operations.osmfoundation.org/policies/tiles/)
+forbids distributing a consumer app that uses them by default without prior
+permission. That is a licensing rule and applies at any traffic level, not
+just at scale. Point it at a commercial OSM provider (MapTiler, Stadia Maps,
+Geoapify, Thunderforest) or self-host - a one-line change in
+[`map_tile_source.dart`](lib/core/map/map_tile_source.dart), and nothing else
+in the app moves.
 
 **The backend is local, by design.** Accounts, reports, verification, alerts
 and subscriptions all run against on-device storage, so every feature is real

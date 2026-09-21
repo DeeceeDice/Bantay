@@ -8,9 +8,17 @@ import 'package:flutter/foundation.dart';
 /// Google) is a one-line change here and requires no code changes anywhere
 /// else in the app.
 ///
-/// Note for production: the public OSM tile servers are run on donated
-/// infrastructure and their usage policy is not suitable for a high-traffic
-/// app. Point [urlTemplate] at your own provider before a wide release.
+/// IMPORTANT before you distribute this app: [openStreetMap] points at the
+/// OpenStreetMap Foundation's volunteer-run tile servers, and their usage
+/// policy forbids distributing a consumer app that uses them by default
+/// without prior permission from the Operations Working Group. This is a
+/// licensing rule, not just a capacity one - it applies at any traffic
+/// level. The default exists so the app runs the moment you clone it.
+///
+/// For any real release, point [urlTemplate] at a commercial OSM provider
+/// (MapTiler, Stadia Maps, Geoapify, Thunderforest) or self-host. That is a
+/// one-line change and nothing else in the app has to move.
+/// See https://operations.osmfoundation.org/policies/tiles/
 @immutable
 class MapTileSource {
   const MapTileSource({
