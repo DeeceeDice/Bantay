@@ -250,6 +250,15 @@ To do the second half:
 After that, a push to `main` that adds a file under `supabase/migrations/`
 applies it to the production database.
 
+> **The seed does not come with it.** Supabase runs `seed.sql` for local
+> development and preview branches only — never against production, because
+> overwriting real rows on every deploy is not a thing anyone wants by
+> accident. So a freshly connected project ends up with all 8 tables, all 14
+> policies and no data at all, which looks broken and is not.
+>
+> Seed production once, by hand, with step 3. After that the app has spots to
+> show and the map stops looking empty.
+
 ### Adding a migration later
 
 Never edit the initial migration once it has been applied anywhere — a
