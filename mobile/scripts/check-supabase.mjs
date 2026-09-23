@@ -11,6 +11,7 @@
  * It checks, in order:
  *   1. the two EXPO_PUBLIC_SUPABASE_* variables are present and well formed
  *   2. the project answers on both its auth and REST endpoints
+ *  2b. the thing answering is really PostgREST and not a proxy in front of it
  *   3. all 8 tables from supabase/migrations/ exist
  *   4. Row Level Security actually denies an anonymous reader
  *   5. (optional) signed in as a real user: the profile trigger fired and the
@@ -197,13 +198,24 @@ async function main() {
     const res = await fetch(`${url}/auth/v1/health`, { headers: { apikey: anonKey } });
     if (res.ok) {
       pass('auth endpoint reachable');
-    } else if (res.status === 401) {
-      fail(
-        'auth endpoint rejected the key (401)',
-        'The URL and the key are probably from different projects.',
-      );
     } else {
-      fail(`auth endpoint returned ${res.status}`);
+      if (res.status === 401) {
+        fail(
+          'auth endpoint rejected the key (401)',
+          'The URL and the key are probably from different projects.',
+        );
+      } else if (res.status === 403) {
+        fail(
+          'auth endpoint returned 403',
+          'Often a proxy, firewall or corporate network policy refusing the host rather than Supabase itself.',
+        );
+      } else {
+        fail(`auth endpoint returned ${res.status}`);
+      }
+      // Anything below this point would be reading a middlebox's replies as
+      // if they came from the database, so stop here.
+      console.log('\nStopping: the project did not answer, so nothing below can be tested.');
+      process.exit(1);
     }
   } catch (error) {
     fail(
@@ -217,6 +229,37 @@ async function main() {
   const client = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // ------------------------------------------------------ 2b. endpoint sanity
+  section('2b. Endpoint sanity');
+
+  // Everything below infers "this table exists" from the *absence* of a
+  // missing-table error, which only means anything if the endpoint actually
+  // tells the two apart. Anything that answers uniformly - a proxy denying the
+  // host, a WAF, a paused project, a parked domain - would otherwise be
+  // reported as a healthy database with all 8 tables present and RLS working,
+  // which is the most misleading output this script could produce.
+  //
+  // So: ask for a table that cannot exist, and require a refusal.
+  const canary = '__bantay_connectivity_canary__';
+  const { error: canaryError } = await client.from(canary).select('*').limit(1);
+
+  if (!isMissingTable(canaryError)) {
+    fail(
+      'the endpoint does not answer like PostgREST',
+      canaryError
+        ? `Asking for a table that cannot exist returned: ${canaryError.message || JSON.stringify(canaryError)}`
+        : 'Asking for a table that cannot exist succeeded, which is impossible.',
+    );
+    console.log(
+      '\nSomething between here and the database is answering on its behalf - a\n' +
+        'proxy, a firewall, or a project that is paused or deleted. Every check\n' +
+        'below would report success against it, so they are skipped rather than\n' +
+        'printed as passes.',
+    );
+    process.exit(1);
+  }
+  pass('endpoint tells missing tables apart from empty ones');
 
   // --------------------------------------------------------------- 3. schema
   section('3. Schema (from supabase/migrations/)');
