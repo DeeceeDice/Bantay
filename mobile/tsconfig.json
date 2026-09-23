@@ -6,6 +6,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    // Listed explicitly: with Expo's base config the jest globals used in
+    // __tests__ are not picked up automatically, so `describe`/`it`/`expect`
+    // fail to resolve during a typecheck even though the tests run fine.
+    "types": ["jest", "node"],
     "paths": {
       "@/*": ["./src/*"]
     }
