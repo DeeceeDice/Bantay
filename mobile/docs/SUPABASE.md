@@ -290,9 +290,21 @@ it.
 
 ## Troubleshooting
 
-**"Supabase is not configured"**
+**"Supabase is not configured"**, or Profile still reads `· on-device`
 `.env` is missing, misspelled, or the server was not restarted. The variables
 must start with `EXPO_PUBLIC_`. Run `npx expo start --clear`.
+
+The `--clear` is not optional advice. `EXPO_PUBLIC_*` values are inlined into
+the bundle at build time, so a bundle built before `.env` existed stays cached
+with no keys in it and the app silently falls back to on-device storage — it
+looks like it works, against the wrong backend. The same applies to
+`npx expo export --clear`. To confirm which bundle you actually have:
+
+```bash
+strings dist/_expo/static/js/android/*.hbc | grep -c 'supabase.co'
+```
+
+`1` means the keys made it in; `0` means you are still on a stale bundle.
 
 **`new row violates row-level security policy`**
 You are signed out, or writing a row that belongs to someone else. Check

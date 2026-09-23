@@ -258,12 +258,19 @@ class SupabaseBackend implements BantayBackend {
   private channel: RealtimeChannel | null = null;
 
   /**
-   * Seeding is a server-side concern here: the SQL migration inserts the
-   * sample safe spots and hazards once, for everyone. Doing it per-client
-   * would race between devices and duplicate rows.
+   * Seeding is a server-side concern here, so this does nothing on purpose.
+   *
+   * Seeding per-client would race between devices and duplicate rows, and the
+   * safe_spots policy is read-only to the app anyway, so an attempt would just
+   * fail under RLS.
+   *
+   * Note that the migration does *not* carry the sample rows: supabase/seed.sql
+   * does, and Supabase runs it only for local development and preview branches,
+   * never against production. A fresh production project therefore has every
+   * table and no data until seed.sql is applied by hand. See docs/SUPABASE.md.
    */
   async seedIfEmpty(): Promise<void> {
-    // Intentionally a no-op; see supabase/migrations/.
+    // Intentionally a no-op; see supabase/seed.sql.
   }
 
   async resetToSeed(): Promise<void> {
