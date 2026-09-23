@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Bantay - sample content
 --
--- Run this AFTER schema.sql. It inserts the safe spots and a few hazards so a
+-- Run this AFTER the migrations. It inserts the safe spots and a few hazards so a
 -- fresh Supabase project opens onto a live-looking map instead of an empty
 -- one, exactly like the on-device demo data.
 --

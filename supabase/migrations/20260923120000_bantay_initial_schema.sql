@@ -1,8 +1,17 @@
 -- ============================================================================
--- Bantay - Supabase schema
+-- Bantay - initial schema
 --
--- Run this ONCE in the Supabase SQL Editor (Dashboard > SQL Editor > New
--- query > paste > Run). It is idempotent: re-running it is safe.
+-- This is a Supabase migration. There are two ways it reaches a database:
+--
+--   * `supabase db push`, or the Supabase GitHub integration, which applies
+--     every file in supabase/migrations/ in filename order. This is the
+--     normal path once the repository is connected to a project.
+--   * Pasting it into the SQL Editor by hand (Dashboard > SQL Editor > New
+--     query > Run), which is the fastest way to set up a one-off project.
+--
+-- Either way it is idempotent: every statement guards itself, so re-running
+-- it only creates what is absent. That is deliberate - a migration that
+-- cannot be re-run is a migration you cannot recover with.
 --
 -- Security model, in one sentence: the anon key shipped in the app is public
 -- by design, so every table below has Row Level Security enabled and the

@@ -10,6 +10,34 @@ The app detects Supabase automatically: if the two environment variables in
 step 5 are set it uses Supabase, otherwise it falls back to on-device storage.
 There is no switch to flip in the code.
 
+### Where the database lives in this repository
+
+```
+supabase/
+  config.toml                                   marks this a Supabase project
+  migrations/
+    20260923120000_bantay_initial_schema.sql    tables, RLS, trigger, realtime
+  seed.sql                                      sample spots and hazards
+```
+
+It sits at the repository root rather than inside `mobile/`, because the
+database is shared infrastructure: the Flutter build, the Expo build and the
+dashboard all talk to the same Postgres.
+
+There are two ways to get that SQL into a project, and they are not
+alternatives so much as stages:
+
+- **By hand**, pasting into the SQL Editor. This is steps 2 and 3 below, it
+  takes two minutes, and it is the right choice for a demo.
+- **Automatically**, by connecting the repository to the project so Supabase
+  applies `supabase/migrations/` on every push to `main`. That is
+  [Step 10](#step-10--optional-apply-migrations-automatically-from-github),
+  and it is worth doing once the schema starts changing.
+
+Connecting the repository on GitHub does **not** by itself put any tables in
+the database. Until one of the two routes above has actually run, the project
+is empty.
+
 ---
 
 ## Step 1 — Create the project
@@ -31,7 +59,8 @@ There is no switch to flip in the code.
 
 1. In the left sidebar open **SQL Editor**.
 2. Click **New query**.
-3. Open `supabase/schema.sql` from this repo, copy **all** of it, paste it in.
+3. Open `supabase/migrations/20260923120000_bantay_initial_schema.sql` from the
+   repository root, copy **all** of it, paste it in.
 4. Click **Run** (or Ctrl/Cmd + Enter).
 
 You should see `Success. No rows returned`.
@@ -45,7 +74,7 @@ and enables realtime. It is safe to run more than once.
 ## Step 3 — Add the sample data
 
 1. **SQL Editor** → **New query** again.
-2. Paste all of `supabase/seed.sql`.
+2. Paste all of `supabase/seed.sql` (repository root).
 3. **Run**.
 
 Check it worked: **Table Editor** → `safe_spots` should show 8 rows, and
@@ -107,6 +136,30 @@ npx expo start --clear
    `Bantay 1.0.0 · Supabase` instead of `· on-device`.
 
 That last line is the quickest way to tell which backend you are on.
+
+### Or check it from the terminal
+
+```bash
+cd mobile
+npm run check:supabase
+```
+
+This reads the same `.env` the app does and reports, in order: whether the
+keys are present and are the *anon* key rather than the service key, whether
+the project answers, whether all 8 tables exist, and whether Row Level
+Security actually refuses an anonymous reader. It exits non-zero on failure,
+so CI can gate on it.
+
+To also verify the signup trigger and the seed data, give it an account you
+have already created in the app:
+
+```bash
+BANTAY_CHECK_EMAIL=you@example.com BANTAY_CHECK_PASSWORD=... npm run check:supabase
+```
+
+The RLS check is the one that earns its keep. The anon key ships inside the
+app, so a project that answers happily but hands rows to a stranger is worse
+than one that is simply down.
 
 ---
 
@@ -170,6 +223,62 @@ difference.
 
 ---
 
+## Step 10 — Optional: apply migrations automatically from GitHub
+
+Connecting the repository to the project means Supabase applies anything new
+in `supabase/migrations/` whenever you push, instead of you pasting SQL.
+
+Two things have to be true, and they are separate:
+
+1. **The repository has to be laid out as a Supabase project** — a
+   `supabase/config.toml` with a `migrations/` directory beside it. That part
+   is already done and committed.
+2. **The integration has to be switched on in the dashboard.** This is the
+   half that cannot live in the repository.
+
+To do the second half:
+
+1. Supabase dashboard → **Project Settings → Integrations → GitHub**.
+2. **Connect repository**, authorise the Supabase GitHub app, pick
+   `DeeceeDice/Bantay`.
+3. Set **Supabase directory path** to `supabase` (the repository root, which
+   is where `config.toml` lives).
+4. Set the **production branch** to `main`.
+5. Optionally enable **branching** so pull requests get a throwaway preview
+   database seeded from `seed.sql`.
+
+After that, a push to `main` that adds a file under `supabase/migrations/`
+applies it to the production database.
+
+### Adding a migration later
+
+Never edit the initial migration once it has been applied anywhere — a
+migration that has already run is history, and changing it means two databases
+silently disagree about what the schema is. Add a new file instead:
+
+```bash
+supabase migration new add_barangay_boundaries
+# writes supabase/migrations/<timestamp>_add_barangay_boundaries.sql
+```
+
+Filenames sort by timestamp and that ordering *is* the apply order, so keep
+the generated prefix.
+
+### Checking it actually ran
+
+The dashboard reports the push as successful when it has applied the
+migrations. Confirm it against the database rather than the green tick:
+
+```bash
+cd mobile && npm run check:supabase
+```
+
+A connected repository with a green deployment and zero tables is a state
+worth being able to recognise, and section 3 of that check is what recognises
+it.
+
+---
+
 ## Troubleshooting
 
 **"Supabase is not configured"**
@@ -181,7 +290,7 @@ You are signed out, or writing a row that belongs to someone else. Check
 **Authentication → Users** and confirm you are logged in.
 
 **Sign-up succeeds but no profile appears**
-The trigger from step 2 did not run. Re-run `schema.sql` and check
+The trigger from step 2 did not run. Re-apply the initial migration and check
 **Database → Triggers** for `on_auth_user_created`.
 
 **"Check your inbox to confirm your email"**
@@ -195,7 +304,7 @@ own hazard. Check the account's `role` in **Table Editor → profiles**.
 
 **Realtime does not update the other phone**
 Check **Database → Publications → supabase_realtime** and confirm `reports`
-is listed. Re-run the last block of `schema.sql` if not.
+is listed. Re-run the last block of the initial migration if not.
 
 ---
 
@@ -212,5 +321,5 @@ is listed. Re-run the last block of `schema.sql` if not.
 | Subscriptions | `spot_subscriptions` | Only you |
 
 The privacy guarantees in that last column are enforced by the RLS policies in
-`schema.sql`, not by the app code. That is deliberate: a client can always be
-modified, a database policy cannot.
+`supabase/migrations/`, not by the app code. That is deliberate: a client can
+always be modified, a database policy cannot.

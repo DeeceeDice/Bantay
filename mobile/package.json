@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "check:supabase": "node scripts/check-supabase.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",

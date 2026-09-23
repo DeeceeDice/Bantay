@@ -1,0 +1,25 @@
+# Supabase project configuration.
+#
+# This file is what marks the repository as a Supabase project. The Supabase
+# GitHub integration looks for it, and for the migrations beside it, to decide
+# what to apply to the connected database.
+#
+# It holds no secrets and is safe to commit. The project it points at is set
+# in the Supabase dashboard (or with `supabase link`), not here.
+
+# Local identifier only - it distinguishes projects running side by side on
+# one machine and has nothing to do with the hosted project's reference id.
+project_id = "bantay"
+
+[db]
+# Match this to the Postgres version of the hosted project, shown under
+# Project Settings > Infrastructure. It only affects `supabase start` locally;
+# a mismatch will not break the hosted database, but it will let a migration
+# pass locally that the real project rejects.
+major_version = 17
+
+[db.seed]
+# Applied to local databases and to preview branches, never to production.
+# Production is seeded deliberately - see docs/SUPABASE.md.
+enabled = true
+sql_paths = ["./seed.sql"]

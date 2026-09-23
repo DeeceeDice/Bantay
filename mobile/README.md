@@ -108,9 +108,19 @@ src/
     repositories/       Backend seam, local + Supabase, pure domain logic
     seed/               Sample Manila data and the offline gazetteer
   state/                App store, location provider
-supabase/               schema.sql and seed.sql
+scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
 __tests__/              58 tests
+```
+
+The SQL is not in here. It lives in `supabase/` at the **repository root**,
+because the database is shared infrastructure rather than something this app
+owns:
+
+```
+supabase/config.toml    marks the repo as a Supabase project
+supabase/migrations/    tables, RLS policies, trigger, realtime
+supabase/seed.sql       sample spots and hazards
 ```
 
 ---
@@ -118,10 +128,14 @@ __tests__/              58 tests
 ## Checks
 
 ```bash
-npm run typecheck   # tsc, strict
-npm run lint        # eslint, including the React Compiler rules
-npm test            # 58 tests
+npm run typecheck        # tsc, strict
+npm run lint             # eslint, including the React Compiler rules
+npm test                 # 58 tests
+npm run check:supabase   # verifies the database connection, schema and RLS
 ```
+
+`check:supabase` is the only one that needs configuration; with no `.env` it
+says so and exits rather than pretending to pass.
 
 Tests cover the Mercator projection and camera maths, geographic distance
 including point-to-path, the verification loop, one-vote-per-user enforcement,

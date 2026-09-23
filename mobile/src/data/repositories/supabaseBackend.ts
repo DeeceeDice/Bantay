@@ -250,7 +250,7 @@ const fromProfile = (p: UserProfile): ProfileRow => ({
  *
  * Reports, safe spots and votes are shared across every device; routes,
  * alerts and subscriptions are scoped to the signed-in user by Row Level
- * Security, so the policies in `supabase/schema.sql` are what actually
+ * Security, so the policies in the initial migration are what actually
  * enforce privacy - not this class.
  */
 class SupabaseBackend implements BantayBackend {
@@ -263,7 +263,7 @@ class SupabaseBackend implements BantayBackend {
    * would race between devices and duplicate rows.
    */
   async seedIfEmpty(): Promise<void> {
-    // Intentionally a no-op; see supabase/schema.sql.
+    // Intentionally a no-op; see supabase/migrations/.
   }
 
   async resetToSeed(): Promise<void> {
@@ -434,7 +434,7 @@ class SupabaseBackend implements BantayBackend {
  * Supabase Auth.
  *
  * The profile row is created by a database trigger on signup (see
- * `supabase/schema.sql`), so a user can never exist without one.
+ * the initial migration), so a user can never exist without one.
  */
 class SupabaseAuth implements BantayAuth {
   readonly kind = 'supabase' as const;
@@ -466,7 +466,7 @@ class SupabaseAuth implements BantayAuth {
     const profile = await this.fetchProfile(data.user.id);
     return profile
       ? authOk(profile)
-      : authFail('Account created but the profile row is missing. Re-run supabase/schema.sql.');
+      : authFail('Account created but the profile row is missing. Re-apply the migrations.');
   }
 
   async logIn(input: { email: string; password: string }): Promise<AuthResult> {
