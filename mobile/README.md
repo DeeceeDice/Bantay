@@ -110,7 +110,7 @@ src/
   state/                App store, location provider
 scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
-__tests__/              58 tests
+__tests__/              70 tests
 ```
 
 The SQL is not in here. It lives in `supabase/` at the **repository root**,
@@ -130,7 +130,7 @@ supabase/seed.sql       sample spots and hazards
 ```bash
 npm run typecheck        # tsc, strict
 npm run lint             # eslint, including the React Compiler rules
-npm test                 # 58 tests
+npm test                 # 70 tests
 npm run check:supabase   # verifies the database connection, schema and RLS
 ```
 

@@ -68,6 +68,7 @@ const COPY = {
     'Dapat hindi bababa sa 8 karakter ang password.',
   ],
   nameRequired: ['Name is required.', 'Kailangan ang pangalan.'],
+  checkYourEmail: ['Check your email', 'Tingnan ang iyong email'],
 
   chooseRole: ['Choose your role', 'Piliin ang iyong role'],
   chooseRoleSub: [

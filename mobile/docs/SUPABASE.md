@@ -127,6 +127,20 @@ npx expo start --clear
 
 ## Step 6 — Check it worked
 
+Before signing up, decide how accounts get confirmed. A new Supabase project
+requires every sign-up to click a link in a confirmation email, and its
+built-in mailer only delivers to members of your Supabase team, at about two
+emails an hour. Anyone else who signs up is told the email could not be sent,
+and never gets an account they can use. Pick one:
+
+- **For a demo, turn confirmation off.** **Authentication → Providers → Email**
+  → disable *Confirm email*. Sign-up then logs straight in.
+- **For real users, keep it on and set up SMTP** under **Authentication →
+  Emails → SMTP Settings**, then add `bantay://**` (and `exp://**` while
+  testing in Expo Go) under **Authentication → URL Configuration → Redirect
+  URLs**, so the confirmation link opens the app instead of `localhost:3000`.
+  The app tells people to check their inbox and sends them to log in.
+
 1. Open the app and sign up with a real email and a password of 8+ characters.
 2. In the Supabase dashboard, go to **Authentication → Users**. Your account
    should be listed.
@@ -312,11 +326,18 @@ You are signed out, or writing a row that belongs to someone else. Check
 
 **Sign-up succeeds but no profile appears**
 The trigger from step 2 did not run. Re-apply the initial migration and check
-**Database → Triggers** for `on_auth_user_created`.
+**Database → Triggers** for `on_auth_user_created`. The app creates a missing
+row itself the next time that account logs in, so an account made before the
+trigger existed still works, but new accounts should get one from the trigger.
 
-**"Check your inbox to confirm your email"**
-Supabase requires email confirmation by default. For a demo, turn it off:
-**Authentication → Providers → Email** → disable *Confirm email*.
+**"Check your email" after signing up**
+The project requires email confirmation, which is the default. The account
+exists and can log in once the link is opened. See step 6 to turn
+confirmation off for a demo, or to set up the mail and redirect it needs.
+
+**"The confirmation email could not be sent"**
+Supabase's built-in mailer only sends to members of your Supabase team, and
+only about twice an hour. Turn *Confirm email* off, or set up SMTP. See step 6.
 
 **The verify button does nothing**
 Only `barangay_official` and `school_admin` may update reports — that is the

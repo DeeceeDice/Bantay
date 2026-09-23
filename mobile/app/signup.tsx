@@ -41,8 +41,16 @@ export default function SignUpScreen(): React.ReactElement {
   const submit = async (): Promise<void> => {
     if (!validate()) return;
     setBusy(true);
-    const error = await signUp({ name, email, password });
+    const { error, confirmEmail } = await signUp({ name, email, password });
     setBusy(false);
+    if (confirmEmail) {
+      // The account exists but cannot log in until the link is opened, so
+      // send them to log-in rather than on to a role screen they cannot save.
+      Alert.alert(s('checkYourEmail'), error ?? undefined, [
+        { text: s('logIn'), onPress: () => router.replace('/login') },
+      ]);
+      return;
+    }
     if (error) {
       Alert.alert(s('somethingWentWrong'), error);
       return;

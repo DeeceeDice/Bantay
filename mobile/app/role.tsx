@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Badge, Button } from '../src/components/ui';
@@ -24,8 +24,14 @@ export default function RoleScreen(): React.ReactElement {
   const advance = async (): Promise<void> => {
     if (!selected) return;
     setBusy(true);
-    await selectRole(selected);
-    setBusy(false);
+    try {
+      await selectRole(selected);
+    } catch (e) {
+      Alert.alert(s('somethingWentWrong'), e instanceof Error ? e.message : undefined);
+      return;
+    } finally {
+      setBusy(false);
+    }
     router.replace('/location');
   };
 

@@ -1,4 +1,5 @@
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { AuthError, RealtimeChannel, User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 
 import { latLng } from '../../core/geo/latLng';
 import {
@@ -22,10 +23,11 @@ import {
   BantayAuth,
   BantayBackend,
   Snapshot,
+  authConfirmEmail,
   authFail,
   authOk,
 } from './backend';
-import { DEFAULT_AREA_CENTER, DEFAULT_AREA_RADIUS_METERS } from './localAuth';
+import { DEFAULT_AREA_CENTER, DEFAULT_AREA_RADIUS_METERS, newProfile } from './localAuth';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 
 export { isSupabaseConfigured };
@@ -245,6 +247,22 @@ const fromProfile = (p: UserProfile): ProfileRow => ({
 
 /* ---------------------------------------------------------------------- */
 
+/** Postgres' unique-violation code: the row is already there. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Inserts a vote or flag. A duplicate means this user already voted, which the
+ * composite primary key exists to catch, so it is not an error. Upserting
+ * instead would need an UPDATE policy these tables deliberately do not have.
+ */
+async function insertIgnoringDuplicate(
+  table: ReturnType<ReturnType<typeof supabase>['from']>,
+  row: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await table.insert(row);
+  if (error && error.code !== UNIQUE_VIOLATION) throw new Error(error.message);
+}
+
 /**
  * Supabase-backed storage.
  *
@@ -312,26 +330,83 @@ class SupabaseBackend implements BantayBackend {
     };
   }
 
+  /**
+   * Stores a report change. The store hands over the whole report, but under
+   * Row Level Security only some of it is this user's to write, so the change
+   * is split by what actually moved:
+   *
+   * - a report that does not exist yet is inserted (as its reporter);
+   * - a change of status is a verification, written only by an official;
+   * - a new vote or flag goes into its own table, never the report row.
+   *
+   * Writing the whole row every time, as an upsert, turned every vote by a
+   * commuter into an UPDATE on `reports`, which the verifier-only policy
+   * rejects - so voting failed for everyone who could not verify.
+   */
   async upsertReport(report: HazardReport): Promise<void> {
     const db = supabase();
-    const { error } = await db.from('reports').upsert(fromReport(report));
-    if (error) throw new Error(error.message);
-
-    // Votes and flags live in their own tables so the database, not the
-    // client, enforces one per user. Writes are idempotent on the composite
-    // primary key.
     const userId = (await db.auth.getUser()).data.user?.id;
+
+    const existing = await db
+      .from('reports')
+      .select('status, verified_by')
+      .eq('id', report.id)
+      .maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
+
+    if (!existing.data) {
+      const { error } = await db.from('reports').insert(fromReport(report));
+      if (error) throw new Error(error.message);
+      return;
+    }
+
+    const row = existing.data as Pick<ReportRow, 'status' | 'verified_by'>;
+    if (row.status !== report.status || row.verified_by !== report.verifiedBy) {
+      const { data, error } = await db
+        .from('reports')
+        .update({
+          status: report.status,
+          verified_by: report.verifiedBy,
+          verified_at: report.verifiedAt,
+        })
+        .eq('id', report.id)
+        .select('id');
+      if (error) throw new Error(error.message);
+      // An update that RLS filters out is not an error, just zero rows. Left
+      // unchecked, the verification would appear to work and never happen.
+      if (!data || data.length === 0) {
+        throw new Error('Only barangay officials and school admins can verify reports.');
+      }
+    }
+
     if (!userId) return;
 
     if (report.votedUserIds.includes(userId)) {
-      await db.from('report_votes').upsert({
+      const votes = await db
+        .from('report_votes')
+        .select('user_id, confirms')
+        .eq('report_id', report.id);
+      if (votes.error) throw new Error(votes.error.message);
+      const rows = (votes.data ?? []) as Pick<VoteRow, 'user_id' | 'confirms'>[];
+
+      if (!rows.some((v) => v.user_id === userId)) {
+        // The report carries counts, not who voted which way. The store adds
+        // exactly one vote on top of what was stored, so if its confirm count
+        // is ahead of the database's, this user's vote was a confirmation.
+        const storedConfirms = rows.filter((v) => v.confirms).length;
+        await insertIgnoringDuplicate(db.from('report_votes'), {
+          report_id: report.id,
+          user_id: userId,
+          confirms: report.confirmCount > storedConfirms,
+        });
+      }
+    }
+
+    if (report.flaggedUserIds.includes(userId)) {
+      await insertIgnoringDuplicate(db.from('report_flags'), {
         report_id: report.id,
         user_id: userId,
-        confirms: report.confirmCount > 0,
       });
-    }
-    if (report.flaggedUserIds.includes(userId)) {
-      await db.from('report_flags').upsert({ report_id: report.id, user_id: userId });
     }
   }
 
@@ -438,10 +513,41 @@ class SupabaseBackend implements BantayBackend {
 }
 
 /**
+ * Turns Supabase Auth's error codes into something a person can act on. The
+ * raw messages ("Email address not authorized", "Invalid login credentials")
+ * are written for developers.
+ */
+function authMessage(error: AuthError, email: string): string {
+  switch (error.code) {
+    case 'invalid_credentials':
+      return 'Incorrect email or password. Please try again.';
+    case 'email_not_confirmed':
+      return `Confirm your email first: open the link we sent to ${email}, then log in.`;
+    case 'user_already_exists':
+    case 'email_exists':
+      return 'An account with that email already exists. Try logging in instead.';
+    case 'weak_password':
+      return 'That password is too weak. Use at least 8 characters.';
+    case 'signup_disabled':
+      return 'New sign-ups are turned off for this project.';
+    case 'email_address_not_authorized':
+    case 'over_email_send_rate_limit':
+      // Both come from Supabase's built-in mailer, which only delivers to the
+      // project's own team and only a couple of times an hour.
+      return 'The confirmation email could not be sent. Ask the project owner to turn off "Confirm email" or set up SMTP - see docs/SUPABASE.md.';
+    default:
+      return error.message;
+  }
+}
+
+/**
  * Supabase Auth.
  *
- * The profile row is created by a database trigger on signup (see
- * the initial migration), so a user can never exist without one.
+ * The profile row is created by a database trigger on signup (see the initial
+ * migration). An account made before that trigger existed has no row, so
+ * every sign-in path goes through `ensureProfile`, which creates the missing
+ * row rather than locking the person out of an account that is otherwise
+ * fine.
  */
 class SupabaseAuth implements BantayAuth {
   readonly kind = 'supabase' as const;
@@ -449,9 +555,15 @@ class SupabaseAuth implements BantayAuth {
   async restore(): Promise<UserProfile | null> {
     const db = supabase();
     const { data } = await db.auth.getSession();
-    const userId = data.session?.user?.id;
-    if (!userId) return null;
-    return this.fetchProfile(userId);
+    const user = data.session?.user;
+    if (!user) return null;
+    try {
+      return await this.ensureProfile(user);
+    } catch {
+      // Offline or the project is unreachable: show the log-in screen rather
+      // than hanging on the splash.
+      return null;
+    }
   }
 
   async signUp(input: {
@@ -460,33 +572,59 @@ class SupabaseAuth implements BantayAuth {
     password: string;
   }): Promise<AuthResult> {
     const db = supabase();
+    const email = input.email.trim().toLowerCase();
     const { data, error } = await db.auth.signUp({
-      email: input.email.trim().toLowerCase(),
+      email,
       password: input.password,
-      options: { data: { name: input.name.trim() } },
+      options: {
+        data: { name: input.name.trim() },
+        // Where the confirmation link sends people. Supabase ignores it and
+        // falls back to the Site URL unless it is on the redirect allow-list.
+        emailRedirectTo: Linking.createURL('/login'),
+      },
     });
-    if (error) return authFail(error.message);
-    if (!data.user) {
-      return authFail('Check your inbox to confirm your email, then log in.');
+    if (error) return authFail(authMessage(error, email));
+    if (!data.user) return authFail('Sign up failed.');
+
+    // With "Confirm email" on, signing up an address that is already
+    // registered does not error - Supabase returns a stand-in user with no
+    // identities, so the response cannot be used to discover who has an
+    // account. Say so plainly rather than asking them to confirm again.
+    if (data.user.identities?.length === 0) {
+      return authFail('An account with that email already exists. Try logging in instead.');
     }
 
-    const profile = await this.fetchProfile(data.user.id);
-    return profile
-      ? authOk(profile)
-      : authFail('Account created but the profile row is missing. Re-apply the migrations.');
+    // No session means the project requires email confirmation. The account
+    // exists; it just cannot sign in yet, and until it can, every read is
+    // anonymous and Row Level Security hides the profile row.
+    if (!data.session) {
+      return authConfirmEmail(
+        `We sent a confirmation link to ${email}. Open it, then log in.`,
+      );
+    }
+
+    try {
+      return authOk(await this.ensureProfile(data.user, input.name));
+    } catch (e) {
+      return authFail(e instanceof Error ? e.message : 'Could not load your profile.');
+    }
   }
 
   async logIn(input: { email: string; password: string }): Promise<AuthResult> {
     const db = supabase();
+    const email = input.email.trim().toLowerCase();
     const { data, error } = await db.auth.signInWithPassword({
-      email: input.email.trim().toLowerCase(),
+      email,
       password: input.password,
     });
-    if (error) return authFail(error.message);
+    if (error) return authFail(authMessage(error, email));
     if (!data.user) return authFail('Log in failed.');
 
-    const profile = await this.fetchProfile(data.user.id);
-    return profile ? authOk(profile) : authFail('Profile not found for this account.');
+    try {
+      return authOk(await this.ensureProfile(data.user));
+    } catch (e) {
+      return authFail(e instanceof Error ? e.message : 'Could not load your profile.');
+    }
   }
 
   /**
@@ -506,7 +644,36 @@ class SupabaseAuth implements BantayAuth {
   }
 
   async logOut(): Promise<void> {
-    await supabase().auth.signOut();
+    // `local` ends this device's session only. Signing out every device is
+    // not what a phone's log-out button means, and it also needs the network,
+    // so a person offline could not log out at all.
+    await supabase().auth.signOut({ scope: 'local' });
+  }
+
+  /** The signed-in user's profile, creating the row if it is missing. */
+  private async ensureProfile(user: User, name?: string): Promise<UserProfile> {
+    const existing = await this.fetchProfile(user.id);
+    if (existing) return existing;
+
+    const email = user.email ?? '';
+    const metaName = (user.user_metadata as { name?: unknown } | null)?.name;
+    const profile = newProfile({
+      id: user.id,
+      name:
+        name?.trim() ||
+        (typeof metaName === 'string' && metaName.trim()) ||
+        email.split('@')[0] ||
+        'Bantay user',
+      email,
+    });
+    // ON CONFLICT DO NOTHING: if the trigger won a race and the row now
+    // exists, it is left alone and the trigger's row is what gets read back.
+    const { error } = await supabase()
+      .from('profiles')
+      .upsert(fromProfile(profile), { onConflict: 'id', ignoreDuplicates: true });
+    if (error) throw new Error(`Could not create your profile: ${error.message}`);
+
+    return (await this.fetchProfile(user.id)) ?? profile;
   }
 
   private async fetchProfile(userId: string): Promise<UserProfile | null> {
@@ -515,7 +682,8 @@ class SupabaseAuth implements BantayAuth {
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) throw new Error(`Could not load your profile: ${error.message}`);
+    if (!data) return null;
 
     const row = data as Partial<ProfileRow>;
     // Tolerate an older schema that predates the assigned-area columns.

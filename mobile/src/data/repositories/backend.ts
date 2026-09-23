@@ -60,18 +60,33 @@ export interface AuthResult {
   ok: boolean;
   profile: UserProfile | null;
   error: string | null;
+  /**
+   * The account was created but cannot be used until its email address is
+   * confirmed. Not a failure: the screen should say "check your inbox", not
+   * "something went wrong".
+   */
+  needsEmailConfirmation: boolean;
 }
 
 export const authOk = (profile: UserProfile): AuthResult => ({
   ok: true,
   profile,
   error: null,
+  needsEmailConfirmation: false,
 });
 
 export const authFail = (error: string): AuthResult => ({
   ok: false,
   profile: null,
   error,
+  needsEmailConfirmation: false,
+});
+
+export const authConfirmEmail = (message: string): AuthResult => ({
+  ok: false,
+  profile: null,
+  error: message,
+  needsEmailConfirmation: true,
 });
 
 export interface BantayAuth {

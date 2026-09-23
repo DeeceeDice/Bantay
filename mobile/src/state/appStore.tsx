@@ -61,7 +61,16 @@ export interface AppState {
 
 export interface AppActions {
   // Auth
-  signUp(input: { name: string; email: string; password: string }): Promise<string | null>;
+  /**
+   * `error` is null on success. `confirmEmail` means the account was created
+   * but must be confirmed from the inbox before it can log in; `error` then
+   * holds the message to show.
+   */
+  signUp(input: {
+    name: string;
+    email: string;
+    password: string;
+  }): Promise<{ error: string | null; confirmEmail: boolean }>;
   logIn(input: { email: string; password: string }): Promise<string | null>;
   signInWithProvider(provider: string): Promise<string | null>;
   selectRole(role: UserProfile['role']): Promise<void>;
@@ -135,14 +144,31 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     setData(await backend.loadAll());
   }, [backend]);
 
+  /**
+   * What a user can see depends on who they are - on Supabase, Row Level
+   * Security returns nothing to a signed-out client and only your own routes
+   * and alerts to a signed-in one - so data is fetched again whenever the
+   * signed-in user changes. A failed fetch leaves the previous data in place
+   * rather than failing the sign-in that triggered it.
+   */
+  const reloadForUser = useCallback(async () => {
+    try {
+      await reload();
+    } catch {
+      // The next realtime event or pull-to-refresh will try again.
+    }
+  }, [reload]);
+
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      await backend.seedIfEmpty();
+      await backend.seedIfEmpty().catch(() => undefined);
       const [snapshot, restored, loadedSettings] = await Promise.all([
-        backend.loadAll(),
-        auth.restore(),
+        // An unreachable backend must not strand the app on the splash
+        // screen: start empty and let the user reach the log-in screen.
+        backend.loadAll().catch(() => emptySnapshot()),
+        auth.restore().catch(() => null),
         loadSettings(),
       ]);
       if (cancelled) return;
@@ -196,11 +222,17 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   const signUp: AppActions['signUp'] = useCallback(
     async (input) => {
       const result = await auth.signUp(input);
-      if (!result.ok || !result.profile) return result.error ?? 'Sign up failed.';
+      if (!result.ok || !result.profile) {
+        return {
+          error: result.error ?? 'Sign up failed.',
+          confirmEmail: result.needsEmailConfirmation,
+        };
+      }
       setUser(result.profile);
-      return null;
+      await reloadForUser();
+      return { error: null, confirmEmail: false };
     },
-    [auth],
+    [auth, reloadForUser],
   );
 
   const logIn: AppActions['logIn'] = useCallback(
@@ -208,9 +240,10 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       const result = await auth.logIn(input);
       if (!result.ok || !result.profile) return result.error ?? 'Log in failed.';
       setUser(result.profile);
+      await reloadForUser();
       return null;
     },
-    [auth],
+    [auth, reloadForUser],
   );
 
   const signInWithProvider: AppActions['signInWithProvider'] = useCallback(
@@ -218,9 +251,10 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       const result = await auth.signInWithProvider(provider);
       if (!result.ok || !result.profile) return result.error ?? 'Sign in failed.';
       setUser(result.profile);
+      await reloadForUser();
       return null;
     },
-    [auth],
+    [auth, reloadForUser],
   );
 
   const selectRole: AppActions['selectRole'] = useCallback(
@@ -234,7 +268,12 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   const logOut: AppActions['logOut'] = useCallback(async () => {
     await auth.logOut();
     setUser(null);
-  }, [auth]);
+    // Drop the previous user's routes, alerts and subscriptions before the
+    // next person signs in on this phone, rather than showing them until the
+    // reload lands.
+    setData((prev) => ({ ...emptySnapshot(), reports: prev.reports, safeSpots: prev.safeSpots }));
+    await reloadForUser();
+  }, [auth, reloadForUser]);
 
   // --- Reports ----------------------------------------------------------
 
