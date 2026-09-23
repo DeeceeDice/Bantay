@@ -102,3 +102,43 @@ jobs:
           name: bantay-web
           path: build/web
           retention-days: 30
+
+  mobile:
+    name: React Native (typecheck, lint, test)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --ci
+
+      # Bundling is the real check that every import resolves and every
+      # screen compiles - a typecheck alone will not catch a bad native
+      # module path.
+      - name: Bundle for Android
+        run: npx expo export --platform android --output-dir dist
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: bantay-rn-bundle
+          path: mobile/dist
+          retention-days: 14

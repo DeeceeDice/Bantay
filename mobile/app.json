@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Bantay",
+    "slug": "bantay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "bantay",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B4FA0"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.deeceedice.bantay",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Bantay uses your location to centre the map, warn you about hazards nearby and place your reports accurately. Your location is never shared with other users.",
+        "NSCameraUsageDescription": "Bantay needs your camera so you can photograph a hazard. The photo is what lets a barangay official verify your report.",
+        "NSPhotoLibraryUsageDescription": "Bantay needs access to your photos so you can attach an existing picture of a hazard to your report."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1B4FA0"
+      },
+      "package": "com.deeceedice.bantay",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Bantay uses your location to centre the map and warn you about hazards nearby."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Bantay needs access to your photos so you can attach a picture of a hazard to your report.",
+          "cameraPermission": "Bantay needs your camera so you can photograph a hazard."
+        }
+      ]
+    ]
+  }
+}
