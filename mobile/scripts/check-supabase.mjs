@@ -9,7 +9,8 @@
  * connect too.
  *
  * It checks, in order:
- *   1. the two EXPO_PUBLIC_SUPABASE_* variables are present and well formed
+ *   1. a project is configured - .env first, then app.json, as the app reads
+ *      it - and its key is the anon key
  *   2. the project answers on both its auth and REST endpoints
  *  2b. the thing answering is really PostgREST and not a proxy in front of it
  *   3. all 8 tables from supabase/migrations/ exist
@@ -103,6 +104,20 @@ function loadEnv() {
   return { ...out, ...process.env };
 }
 
+/** The project committed in app.json (`expo.extra.supabase`), if any. */
+function loadAppJsonProject() {
+  try {
+    const appJson = JSON.parse(readFileSync(resolve(projectRoot, 'app.json'), 'utf8'));
+    const cfg = appJson?.expo?.extra?.supabase ?? {};
+    return {
+      url: typeof cfg.url === 'string' ? cfg.url.trim() : '',
+      anonKey: typeof cfg.anonKey === 'string' ? cfg.anonKey.trim() : '',
+    };
+  } catch {
+    return { url: '', anonKey: '' };
+  }
+}
+
 /**
  * A missing table reads very differently from a table RLS is hiding, but only
  * if the probe asks for a body.
@@ -131,22 +146,27 @@ async function main() {
   // ---------------------------------------------------------------- 1. config
   section('1. Configuration');
 
+  // Same precedence as the app: .env / environment first, then app.json.
   const env = loadEnv();
-  const url = (env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
-  const anonKey = (env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+  const fromApp = loadAppJsonProject();
+  const url = (env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim() || fromApp.url;
+  const anonKey = (env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim() || fromApp.anonKey;
+  const source = (env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim() ? '.env' : 'app.json';
 
   if (!url || !anonKey) {
     fail(
-      'EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are not both set',
-      'Copy .env.example to .env and fill in Project Settings > API. See docs/SUPABASE.md.',
+      'no Supabase project configured',
+      'Set expo.extra.supabase in app.json, or EXPO_PUBLIC_SUPABASE_URL and ' +
+        'EXPO_PUBLIC_SUPABASE_ANON_KEY in .env. See docs/SUPABASE.md.',
     );
     console.log(
-      '\nNothing else can be checked without them. The app treats this same ' +
-        'state as\n"no backend configured" and runs on-device instead, which is ' +
-        'why it still works\nwith no keys at all.',
+      '\nNothing else can be checked without a project. The app treats this ' +
+        'state the same way:\nit shows "not connected to a database" and ' +
+        'lets no one sign up or log in.',
     );
     process.exit(1);
   }
+  pass(`project configured (from ${source})`);
 
   let host;
   try {

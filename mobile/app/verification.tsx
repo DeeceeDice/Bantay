@@ -49,10 +49,16 @@ export default function VerificationScreen(): React.ReactElement {
         style: 'destructive',
         onPress: () => {
           setBusyId(reportId);
-          void rejectReport(reportId).then(() => {
-            setBusyId(null);
-            Alert.alert(s('reportRejectedToast'));
-          });
+          void rejectReport(reportId).then(
+            () => {
+              setBusyId(null);
+              Alert.alert(s('reportRejectedToast'));
+            },
+            (error: unknown) => {
+              setBusyId(null);
+              Alert.alert(s('somethingWentWrong'), error instanceof Error ? error.message : String(error));
+            },
+          );
         },
       },
     ]);
@@ -144,10 +150,21 @@ export default function VerificationScreen(): React.ReactElement {
                   loading={busyId === report.id}
                   onPress={() => {
                     setBusyId(report.id);
-                    void verifyReport(report.id).then(() => {
-                      setBusyId(null);
-                      Alert.alert(s('reportVerifiedToast'));
-                    });
+                    void verifyReport(report.id).then(
+                      () => {
+                        setBusyId(null);
+                        Alert.alert(s('reportVerifiedToast'));
+                      },
+                      (error: unknown) => {
+                        // RLS refuses anyone who is not an official, and the
+                        // backend turns that silent refusal into an error.
+                        setBusyId(null);
+                        Alert.alert(
+                          s('somethingWentWrong'),
+                          error instanceof Error ? error.message : String(error),
+                        );
+                      },
+                    );
                   }}
                 />
               </View>

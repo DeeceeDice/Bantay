@@ -22,19 +22,11 @@ export const emptySnapshot = (): Snapshot => ({
  *
  * Deliberately storage-level rather than operation-level: all of Bantay's
  * rules - one vote per user, what verification does to stats and alerts, how
- * a route picks up hazards - live once in `bantayStore`, and a backend only
- * has to store and return rows. That means the local and Supabase backends
- * can never disagree about behaviour, because neither one implements it.
- *
- * `subscribe` is optional: the local backend has nobody to hear from, while
- * Supabase pushes realtime changes so two devices stay in step.
+ * a route picks up hazards - live once in `appStore` and `logic.ts`, and the
+ * backend only stores and returns rows. Supabase is the only implementation;
+ * the interface exists so the store can be tested against a fake client.
  */
 export interface BantayBackend {
-  readonly kind: 'local' | 'supabase';
-
-  /** Writes the bundled sample content, but only on a genuinely empty store. */
-  seedIfEmpty(): Promise<void>;
-
   loadAll(): Promise<Snapshot>;
 
   upsertReport(report: HazardReport): Promise<void>;
@@ -45,17 +37,13 @@ export interface BantayBackend {
   setSubscribedSpots(spotIds: string[]): Promise<void>;
   upsertProfile(profile: UserProfile): Promise<void>;
 
-  /** Restores the bundled sample content, discarding current rows. */
-  resetToSeed(): Promise<void>;
-
   /**
    * Notifies when another device changes shared data. Returns an unsubscribe
-   * function. Backends without realtime simply omit this.
+   * function.
    */
-  subscribe?(onChange: () => void): () => void;
+  subscribe(onChange: () => void): () => void;
 }
 
-/** Auth is a separate seam, because a real backend replaces it first. */
 export interface AuthResult {
   ok: boolean;
   profile: UserProfile | null;
@@ -63,7 +51,8 @@ export interface AuthResult {
   /**
    * The account was created but cannot be used until its email address is
    * confirmed. Not a failure: the screen should say "check your inbox", not
-   * "something went wrong".
+   * "something went wrong". Only happens if the project owner turns "Confirm
+   * email" back on.
    */
   needsEmailConfirmation: boolean;
 }
@@ -89,9 +78,12 @@ export const authConfirmEmail = (message: string): AuthResult => ({
   needsEmailConfirmation: true,
 });
 
+/**
+ * Accounts. Every method goes to Supabase Auth: an account exists only if it
+ * exists in the project's `auth.users` table, and a session is only ever one
+ * that Supabase issued.
+ */
 export interface BantayAuth {
-  readonly kind: 'local' | 'supabase';
-
   /** Restores a previous session, or null when signed out. */
   restore(): Promise<UserProfile | null>;
 
@@ -103,9 +95,14 @@ export interface BantayAuth {
 
   logIn(input: { email: string; password: string }): Promise<AuthResult>;
 
-  signInWithProvider(provider: string): Promise<AuthResult>;
-
   updateProfile(profile: UserProfile): Promise<void>;
 
   logOut(): Promise<void>;
+
+  /**
+   * Calls back when the session ends without the user pressing "log out" -
+   * a refresh token that was revoked or expired, or the account deleted.
+   * Returns an unsubscribe function.
+   */
+  onSignedOut(callback: () => void): () => void;
 }

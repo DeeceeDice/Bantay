@@ -27,10 +27,8 @@ import {
   authFail,
   authOk,
 } from './backend';
-import { DEFAULT_AREA_CENTER, DEFAULT_AREA_RADIUS_METERS, newProfile } from './localAuth';
-import { isSupabaseConfigured, supabase } from './supabaseClient';
-
-export { isSupabaseConfigured };
+import { DEFAULT_AREA_CENTER, DEFAULT_AREA_RADIUS_METERS, newProfile } from './profiles';
+import { supabase } from './supabaseClient';
 
 /* -------------------------------------------------------------------------
  * Row mappers
@@ -272,32 +270,15 @@ async function insertIgnoringDuplicate(
  * enforce privacy - not this class.
  */
 class SupabaseBackend implements BantayBackend {
-  readonly kind = 'supabase' as const;
   private channel: RealtimeChannel | null = null;
 
-  /**
-   * Seeding is a server-side concern here, so this does nothing on purpose.
-   *
-   * Seeding per-client would race between devices and duplicate rows, and the
-   * safe_spots policy is read-only to the app anyway, so an attempt would just
-   * fail under RLS.
-   *
-   * Note that the migration does *not* carry the sample rows: supabase/seed.sql
-   * does, and Supabase runs it only for local development and preview branches,
-   * never against production. A fresh production project therefore has every
-   * table and no data until seed.sql is applied by hand. See docs/SUPABASE.md.
+  /*
+   * There is no seeding or "reset sample data" here. Shared rows are written
+   * once, server-side, by supabase/seed.sql - never by a client, where it
+   * would race between devices and the read-only safe_spots policy would
+   * refuse it anyway. Supabase runs seed.sql only for local development and
+   * preview branches, so production is seeded by hand. See docs/SUPABASE.md.
    */
-  async seedIfEmpty(): Promise<void> {
-    // Intentionally a no-op; see supabase/seed.sql.
-  }
-
-  async resetToSeed(): Promise<void> {
-    // Destructive shared-data resets belong in the dashboard or a migration,
-    // not behind a button any demo viewer can press.
-    throw new Error(
-      'Resetting sample data is disabled on the Supabase backend. Re-run supabase/seed.sql instead.',
-    );
-  }
 
   async loadAll(): Promise<Snapshot> {
     const db = supabase();
@@ -550,8 +531,6 @@ function authMessage(error: AuthError, email: string): string {
  * fine.
  */
 class SupabaseAuth implements BantayAuth {
-  readonly kind = 'supabase' as const;
-
   async restore(): Promise<UserProfile | null> {
     const db = supabase();
     const { data } = await db.auth.getSession();
@@ -627,17 +606,6 @@ class SupabaseAuth implements BantayAuth {
     }
   }
 
-  /**
-   * OAuth needs a redirect flow that only makes sense once the app has a real
-   * scheme registered and a provider configured in the Supabase dashboard,
-   * so it fails loudly here rather than pretending to work.
-   */
-  async signInWithProvider(provider: string): Promise<AuthResult> {
-    return authFail(
-      `${provider} sign-in needs an OAuth provider configured in your Supabase dashboard. See docs/SUPABASE.md, step 8.`,
-    );
-  }
-
   async updateProfile(profile: UserProfile): Promise<void> {
     const { error } = await supabase().from('profiles').upsert(fromProfile(profile));
     if (error) throw new Error(error.message);
@@ -648,6 +616,19 @@ class SupabaseAuth implements BantayAuth {
     // not what a phone's log-out button means, and it also needs the network,
     // so a person offline could not log out at all.
     await supabase().auth.signOut({ scope: 'local' });
+  }
+
+  /**
+   * A session can end without anyone pressing "log out": the refresh token is
+   * revoked, expires, or the account is deleted. Without this the app would
+   * keep showing a signed-in screen whose every write Row Level Security then
+   * refuses.
+   */
+  onSignedOut(callback: () => void): () => void {
+    const { data } = supabase().auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') callback();
+    });
+    return () => data.subscription.unsubscribe();
   }
 
   /** The signed-in user's profile, creating the row if it is missing. */

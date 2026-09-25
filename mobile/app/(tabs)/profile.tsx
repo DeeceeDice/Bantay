@@ -15,7 +15,7 @@ import { useApp } from '../../src/state/appStore';
 /** Profile, stats and every app setting. */
 export default function ProfileScreen(): React.ReactElement {
   const app = useApp();
-  const { s, user, data, settings, backendKind } = app;
+  const { s, user, data, settings } = app;
 
   if (!user) {
     return (
@@ -198,24 +198,6 @@ export default function ProfileScreen(): React.ReactElement {
             trailing={s(roleLabelKey(user.role))}
             onPress={() => router.push('/role')}
           />
-          {backendKind === 'local' && (
-            <>
-              <Divider />
-              <Row
-                icon="restore"
-                label={s('resetDemoData')}
-                onPress={() => {
-                  Alert.alert(s('resetDemoData'), s('resetDemoDataDesc'), [
-                    { text: s('cancel'), style: 'cancel' },
-                    {
-                      text: s('confirm'),
-                      onPress: () => void app.resetSampleData(),
-                    },
-                  ]);
-                }}
-              />
-            </>
-          )}
         </Card>
 
         <Button
@@ -226,9 +208,7 @@ export default function ProfileScreen(): React.ReactElement {
           style={styles.logOut}
           onPress={confirmLogOut}
         />
-        <Text style={styles.version}>
-          Bantay 1.0.0 · {backendKind === 'supabase' ? 'Supabase' : 'on-device'}
-        </Text>
+        <Text style={styles.version}>Bantay 1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );

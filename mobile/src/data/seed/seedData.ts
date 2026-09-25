@@ -11,14 +11,15 @@ const minutesAgo = (now: Date, minutes: number): string =>
   new Date(now.getTime() - minutes * 60_000).toISOString();
 
 /**
- * Initial content so a freshly installed app opens onto a live, believable
- * map instead of an empty screen.
+ * Sample content for the test suite.
  *
- * Centred on the España Blvd corridor in Sampaloc, Manila. Written once on
- * first launch; after that the user's own reports own the data.
+ * The app never writes these anywhere: everything it shows comes from the
+ * database, and the database's sample spots and hazards are loaded by
+ * supabase/seed.sql. These exist so the domain rules in logic.ts can be
+ * tested against a realistic map without a network.
  *
- * These are realistic samples, not live feeds. Replace them with real LGU
- * data before anyone relies on them in a storm.
+ * Centred on the España Blvd corridor in Sampaloc, Manila. Realistic samples,
+ * not live feeds.
  */
 export function seedReports(now: Date): HazardReport[] {
   return [

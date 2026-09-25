@@ -5,7 +5,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { BantayLogo } from '../src/components/ui/Pins';
 import { Colors, Spacing } from '../src/core/theme/colors';
-import { StoreKeys } from '../src/data/repositories/localBackend';
+import { StoreKeys } from '../src/data/repositories/storeKeys';
 import { useApp } from '../src/state/appStore';
 import { useUserLocation } from '../src/state/LocationProvider';
 

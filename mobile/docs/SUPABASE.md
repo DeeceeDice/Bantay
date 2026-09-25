@@ -1,14 +1,22 @@
 # Connecting Bantay to Supabase
 
-The app runs with **no backend at all** out of the box — everything is stored
-on the device. Follow these steps only when you want real accounts and data
-shared between phones.
+Bantay keeps everything in one Supabase project. Creating an account writes
+it to that project's `auth.users` table, the sign-up trigger writes its row in
+`public.profiles`, and signing in checks the password against the database.
+There is no on-device mode, no guest mode and no social sign-in button that
+does not reach a real provider: an account that is not in the database does
+not exist, and every screen past log-in is locked until Supabase has issued a
+session.
+
+**This repository is already connected.** `app.json` (`expo.extra.supabase`)
+names the project, so a fresh clone and every build sign up and log in against
+it with no setup. The steps below are for standing up a *different* project,
+or rebuilding this one from scratch.
 
 **Time:** about 20 minutes. **Cost:** ₱0. No credit card.
 
-The app detects Supabase automatically: if the two environment variables in
-step 5 are set it uses Supabase, otherwise it falls back to on-device storage.
-There is no switch to flip in the code.
+If neither `app.json` nor `.env` names a project, the app does not start in
+some reduced mode - it shows a "not connected to a database" screen.
 
 ### Where the database lives in this repository
 
@@ -104,17 +112,29 @@ Check it worked: **Table Editor** → `safe_spots` should show 8 rows, and
 
 ## Step 5 — Point the app at your project
 
-In the `mobile/` folder create a file called `.env`:
+The project every build uses is set in `mobile/app.json`:
+
+```json
+"extra": {
+  "supabase": {
+    "url": "https://abcdefgh.supabase.co",
+    "anonKey": "eyJhbGciOi...your-anon-key..."
+  }
+}
+```
+
+Committing these is deliberate: the anon key is public by design, it ships
+inside every build anyway, and Row Level Security is what protects the data.
+Never put the `service_role` key here - `npm test` fails if the key in
+`app.json` is anything but an anon key.
+
+To point just your own machine at a different project, create `mobile/.env`
+instead. It overrides `app.json` and is ignored by git:
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...your-anon-key...
 ```
-
-The `EXPO_PUBLIC_` prefix is required — it is what tells Expo to make the
-value available to app code.
-
-`.env` is already in `.gitignore`, so your keys will not be committed.
 
 Now restart with the cache cleared, or Expo will keep serving the old bundle
 that had no keys in it:
@@ -126,6 +146,11 @@ npx expo start --clear
 ---
 
 ## Step 6 — Check it worked
+
+The connected project already has confirmation off and requires passwords of
+at least 8 characters on the server, matching the sign-up screen, so the rule
+cannot be skipped by calling the API directly. For a new project, set
+**Authentication → Providers → Email → Minimum password length** to 8.
 
 Before signing up, decide how accounts get confirmed. A new Supabase project
 requires every sign-up to click a link in a confirmation email, and its
@@ -146,10 +171,8 @@ and never gets an account they can use. Pick one:
    should be listed.
 3. Go to **Table Editor → profiles**. There should be a matching row, created
    by the trigger.
-4. In the app, open **Profile** and scroll to the bottom. It should read
-   `Bantay 1.0.0 · Supabase` instead of `· on-device`.
-
-That last line is the quickest way to tell which backend you are on.
+4. Pick a role on the next screen, log out, and log back in. The role you
+   picked should still be there - it was read back from `profiles`.
 
 ### Or check it from the terminal
 
@@ -158,7 +181,8 @@ cd mobile
 npm run check:supabase
 ```
 
-This reads the same `.env` the app does and reports, in order: whether the
+This reads the same configuration the app does (`.env`, then `app.json`)
+and reports, in order: whether the
 keys are present and are the *anon* key rather than the service key, whether
 the project answers, whether all 8 tables exist, and whether Row Level
 Security actually refuses an anonymous reader. It exits non-zero on failure,
@@ -199,20 +223,20 @@ If the pin does not change, see Troubleshooting below.
 
 ## Step 8 — Optional: Google sign-in
 
-The Google button currently returns a clear error on the Supabase backend
-rather than pretending to work. To make it real:
+The app does not offer Google sign-in, because the project has no Google
+provider configured and a button that cannot reach Google would be a fake
+door. Email and password are the only way in. To add Google for real:
 
-1. Dashboard → **Authentication → Providers → Google** → enable.
-2. Create OAuth credentials in the
-   [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   and paste the client ID and secret into Supabase.
-3. Add `bantay://` to the provider's redirect allow-list. The scheme is
-   already registered in `app.json`.
-4. Replace the body of `signInWithProvider` in
-   `src/data/repositories/supabaseBackend.ts` with `supabase().auth
-   .signInWithOAuth({ provider: 'google', options: { redirectTo } })`.
-
-Email and password work without any of this, which is enough for a demo.
+1. Create OAuth credentials in the
+   [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Dashboard → **Authentication → Providers → Google** → enable, and paste in
+   the client ID and secret.
+3. Add `bantay://**` under **Authentication → URL Configuration → Redirect
+   URLs**. The scheme is already registered in `app.json`.
+4. Add a `signInWithGoogle` method to `SupabaseAuth` that calls
+   `supabase().auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })`
+   and completes the redirect, then put the button back on the log-in and
+   sign-up screens - only once it signs a real Google account in.
 
 ---
 
@@ -304,21 +328,25 @@ it.
 
 ## Troubleshooting
 
-**"Supabase is not configured"**, or Profile still reads `· on-device`
-`.env` is missing, misspelled, or the server was not restarted. The variables
-must start with `EXPO_PUBLIC_`. Run `npx expo start --clear`.
+**"Bantay is not connected to a database"**
+Neither `app.json` (`expo.extra.supabase`) nor `.env` names a project. Restore
+the `extra.supabase` block in `app.json`, or check `.env` for typos - its
+variables must start with `EXPO_PUBLIC_`.
 
-The `--clear` is not optional advice. `EXPO_PUBLIC_*` values are inlined into
-the bundle at build time, so a bundle built before `.env` existed stays cached
-with no keys in it and the app silently falls back to on-device storage — it
-looks like it works, against the wrong backend. The same applies to
-`npx expo export --clear`. To confirm which bundle you actually have:
+**Changed `.env` or `app.json` but the app still talks to the old project**
+Restart with `npx expo start --clear`. `EXPO_PUBLIC_*` values from `.env` are
+inlined into the JavaScript bundle at build time, so a cached bundle keeps
+whatever was there when it was built. The same applies to
+`npx expo export --clear`. To see which project a built bundle uses when it
+came from `.env`:
 
 ```bash
 strings dist/_expo/static/js/android/*.hbc | grep -c 'supabase.co'
 ```
 
-`1` means the keys made it in; `0` means you are still on a stale bundle.
+Values from `app.json` are not in the JavaScript at all - they travel in the
+app manifest - so to check those, run `npx expo config --type public` and
+look at `extra.supabase`.
 
 **`new row violates row-level security policy`**
 You are signed out, or writing a row that belongs to someone else. Check

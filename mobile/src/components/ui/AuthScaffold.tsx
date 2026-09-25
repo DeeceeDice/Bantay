@@ -122,17 +122,6 @@ export function Field({
   );
 }
 
-/** "or" rule between the email form and the social buttons. */
-export function OrDivider({ label }: { label: string }): React.ReactElement {
-  return (
-    <View style={styles.divider}>
-      <View style={styles.rule} />
-      <Text style={styles.dividerLabel}>{label}</Text>
-      <View style={styles.rule} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.surface },
   flex: { flex: 1 },
@@ -170,11 +159,4 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16, color: Colors.ink, paddingVertical: Spacing.md },
   inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
   errorText: { fontSize: 12.5, color: Colors.brandRed, marginTop: 5, fontWeight: '600' },
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing.xl },
-  rule: { flex: 1, height: 1, backgroundColor: Colors.line },
-  dividerLabel: {
-    marginHorizontal: Spacing.lg,
-    color: Colors.inkFaint,
-    fontWeight: '600',
-  },
 });

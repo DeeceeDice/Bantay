@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AuthScaffold, Field, OrDivider } from '../src/components/ui/AuthScaffold';
+import { AuthScaffold, Field } from '../src/components/ui/AuthScaffold';
 import { Button } from '../src/components/ui';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import { useApp } from '../src/state/appStore';
@@ -10,16 +10,18 @@ import { useUserLocation } from '../src/state/LocationProvider';
 
 const EMAIL_RE = /^[\w.+-]+@[\w-]+\.[\w.-]+$/;
 
-/** Email / social log-in for returning users. */
+/**
+ * Email and password log-in against Supabase Auth. The only way in: there is
+ * no guest mode and no social button that does not reach a real provider.
+ */
 export default function LoginScreen(): React.ReactElement {
-  const { s, logIn, signInWithProvider, settings } = useApp();
+  const { s, logIn, settings } = useApp();
   const location = useUserLocation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState(false);
-  const [provider, setProvider] = useState<string | null>(null);
 
   /** A returning user who already granted location skips the prompt. */
   const proceed = async (): Promise<void> => {
@@ -46,17 +48,6 @@ export default function LoginScreen(): React.ReactElement {
     setBusy(true);
     const error = await logIn({ email, password });
     setBusy(false);
-    if (error) {
-      Alert.alert(s('somethingWentWrong'), error);
-      return;
-    }
-    await proceed();
-  };
-
-  const social = async (which: string): Promise<void> => {
-    setProvider(which);
-    const error = await signInWithProvider(which);
-    setProvider(null);
     if (error) {
       Alert.alert(s('somethingWentWrong'), error);
       return;
@@ -99,14 +90,6 @@ export default function LoginScreen(): React.ReactElement {
         testID="login-password"
       />
       <Button label={s('logIn')} onPress={submit} loading={busy} />
-      <OrDivider label={s('orDivider')} />
-      <Button
-        label={s('continueWithGoogle')}
-        variant="outline"
-        icon="account-circle"
-        loading={provider === 'google'}
-        onPress={() => social('google')}
-      />
     </AuthScaffold>
   );
 }

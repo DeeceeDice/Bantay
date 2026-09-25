@@ -2,23 +2,26 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AuthScaffold, Field, OrDivider } from '../src/components/ui/AuthScaffold';
+import { AuthScaffold, Field } from '../src/components/ui/AuthScaffold';
 import { Button } from '../src/components/ui';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import { useApp } from '../src/state/appStore';
 
 const EMAIL_RE = /^[\w.+-]+@[\w-]+\.[\w.-]+$/;
 
-/** Account creation. On success the user continues to role selection. */
+/**
+ * Account creation. The account is written to Supabase Auth (`auth.users`)
+ * and its profile to `public.profiles` by the sign-up trigger; on success the
+ * user is signed in and continues to role selection.
+ */
 export default function SignUpScreen(): React.ReactElement {
-  const { s, signUp, signInWithProvider } = useApp();
+  const { s, signUp } = useApp();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState(false);
-  const [provider, setProvider] = useState<string | null>(null);
 
   const validate = (): boolean => {
     const next: Record<string, string | null> = {
@@ -51,17 +54,6 @@ export default function SignUpScreen(): React.ReactElement {
       ]);
       return;
     }
-    if (error) {
-      Alert.alert(s('somethingWentWrong'), error);
-      return;
-    }
-    router.replace('/role');
-  };
-
-  const social = async (which: string): Promise<void> => {
-    setProvider(which);
-    const error = await signInWithProvider(which);
-    setProvider(null);
     if (error) {
       Alert.alert(s('somethingWentWrong'), error);
       return;
@@ -113,21 +105,11 @@ export default function SignUpScreen(): React.ReactElement {
         testID="signup-password"
       />
       <Button label={s('signUp')} onPress={submit} loading={busy} />
-      <OrDivider label={s('orDivider')} />
-      <Button
-        label={s('continueWithGoogle')}
-        variant="outline"
-        icon="account-circle"
-        loading={provider === 'google'}
-        onPress={() => social('google')}
-        style={styles.social}
-      />
     </AuthScaffold>
   );
 }
 
 const styles = StyleSheet.create({
-  social: { marginTop: Spacing.md },
   footer: {
     flexDirection: 'row',
     flexWrap: 'wrap',

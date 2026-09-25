@@ -92,15 +92,25 @@ export default function ReportScreen(): React.ReactElement {
   const submit = async (): Promise<void> => {
     if (!type || !severity || !photoUri) return;
     setBusy(true);
-    const report = await submitReport({
-      type,
-      severity,
-      location: point,
-      addressLabel,
-      description,
-      photoUri,
-    });
-    setBusy(false);
+    let report: Awaited<ReturnType<typeof submitReport>>;
+    try {
+      report = await submitReport({
+        type,
+        severity,
+        location: point,
+        addressLabel,
+        description,
+        photoUri,
+      });
+    } catch (error) {
+      // The database refused it - signed out, offline, or a policy said no.
+      // Say so, rather than leaving the button spinning on a report that
+      // was never stored.
+      Alert.alert(s('somethingWentWrong'), error instanceof Error ? error.message : String(error));
+      return;
+    } finally {
+      setBusy(false);
+    }
 
     Alert.alert(s('reportSubmittedTitle'), s('reportSubmittedBody'), [
       {

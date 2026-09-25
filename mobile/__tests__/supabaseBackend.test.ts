@@ -81,6 +81,9 @@ function query(table: string) {
   return builder;
 }
 
+type AuthListener = (event: string) => void;
+const authListeners = new Set<AuthListener>();
+
 const mockClient = {
   from: query,
   auth: {
@@ -91,8 +94,14 @@ const mockClient = {
     signUp: async () => state.signUpResponse,
     signInWithPassword: async () => state.signInResponse,
     signOut: async () => ({ error: null }),
+    onAuthStateChange: (listener: AuthListener) => {
+      authListeners.add(listener);
+      return { data: { subscription: { unsubscribe: () => authListeners.delete(listener) } } };
+    },
   },
 };
+
+const emitAuthEvent = (event: string): void => authListeners.forEach((l) => l(event));
 
 jest.mock('../src/data/repositories/supabaseClient', () => ({
   isSupabaseConfigured: () => true,
@@ -227,6 +236,38 @@ describe('SupabaseAuth.logIn', () => {
     };
     const result = await createSupabaseAuth().logIn({ email: 'a@b.ph', password: 'x' });
     expect(result.error).toBe('Incorrect email or password. Please try again.');
+  });
+});
+
+describe('SupabaseAuth has no way in but a Supabase account', () => {
+  it('offers only email and password - no provider or guest sign-in', () => {
+    const auth = createSupabaseAuth() as unknown as Record<string, unknown>;
+    expect(typeof auth.signUp).toBe('function');
+    expect(typeof auth.logIn).toBe('function');
+    expect(auth.signInWithProvider).toBeUndefined();
+    expect(auth.signInAnonymously).toBeUndefined();
+  });
+
+  it('has no session to restore when Supabase has none', async () => {
+    expect(await createSupabaseAuth().restore()).toBeNull();
+  });
+});
+
+describe('SupabaseAuth.onSignedOut', () => {
+  it('fires when Supabase ends the session, and only then', () => {
+    const callback = jest.fn();
+    const stop = createSupabaseAuth().onSignedOut(callback);
+
+    emitAuthEvent('TOKEN_REFRESHED');
+    emitAuthEvent('SIGNED_IN');
+    expect(callback).not.toHaveBeenCalled();
+
+    emitAuthEvent('SIGNED_OUT');
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    stop();
+    emitAuthEvent('SIGNED_OUT');
+    expect(callback).toHaveBeenCalledTimes(1);
   });
 });
 

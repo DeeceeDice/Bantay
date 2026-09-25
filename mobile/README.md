@@ -19,13 +19,17 @@ npx expo start
 Scan the QR code with **Expo Go** on your phone, or press `a` for an Android
 emulator, `i` for an iOS simulator, `w` for the browser.
 
-**No API keys, no accounts, no backend.** The app ships with sample hazards
-around Sampaloc, Manila and stores everything on the device. Every feature
-works immediately — that is deliberate, so a demo needs zero setup.
+**Accounts are real.** Signing up creates an account in the project's
+Supabase database and signing in checks it there - there is no on-device
+mode, no guest mode and no sign-in button that does not reach a real
+provider. Every screen past log-in stays locked until Supabase has issued a
+session.
 
-To share data between phones, see **[docs/SUPABASE.md](docs/SUPABASE.md)**.
-The app switches backends automatically when the Supabase environment
-variables are present.
+No setup is needed to try it: `app.json` already names the project
+(`expo.extra.supabase`), and the database carries the sample hazards and safe
+spots around Sampaloc, Manila. To stand up your own project, or point your
+machine at another one with `.env`, see
+**[docs/SUPABASE.md](docs/SUPABASE.md)**.
 
 ---
 

@@ -18,7 +18,7 @@ import { BantayLogo } from '../src/components/ui/Pins';
 import { Button } from '../src/components/ui';
 import { IconName } from '../src/core/utils/hazardVisuals';
 import { Colors, Spacing } from '../src/core/theme/colors';
-import { StoreKeys } from '../src/data/repositories/localBackend';
+import { StoreKeys } from '../src/data/repositories/storeKeys';
 import { useApp } from '../src/state/appStore';
 
 const { width } = Dimensions.get('window');

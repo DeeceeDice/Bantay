@@ -18,9 +18,8 @@ import {
   SavedRoute,
   UserProfile,
 } from '../data/models/types';
+import { uuid } from '../core/utils/uuid';
 import { BantayAuth, BantayBackend, Snapshot, emptySnapshot } from '../data/repositories/backend';
-import { LocalAuth, uuid } from '../data/repositories/localAuth';
-import { LocalBackend, StoreKeys } from '../data/repositories/localBackend';
 import {
   applyFlag,
   applyVote,
@@ -28,7 +27,8 @@ import {
   isOnAnySavedRoute,
   routeContaining,
 } from '../data/repositories/logic';
-import { createSupabaseAuth, createSupabaseBackend, isSupabaseConfigured } from '../data/repositories/supabaseBackend';
+import { StoreKeys } from '../data/repositories/storeKeys';
+import { createSupabaseAuth, createSupabaseBackend } from '../data/repositories/supabaseBackend';
 
 export interface Settings {
   language: Language;
@@ -52,7 +52,6 @@ const DEFAULT_SETTINGS: Settings = {
 
 export interface AppState {
   ready: boolean;
-  backendKind: 'local' | 'supabase';
   user: UserProfile | null;
   data: Snapshot;
   settings: Settings;
@@ -72,7 +71,6 @@ export interface AppActions {
     password: string;
   }): Promise<{ error: string | null; confirmEmail: boolean }>;
   logIn(input: { email: string; password: string }): Promise<string | null>;
-  signInWithProvider(provider: string): Promise<string | null>;
   selectRole(role: UserProfile['role']): Promise<void>;
   logOut(): Promise<void>;
 
@@ -111,7 +109,6 @@ export interface AppActions {
   toggleLayer(layer: MapLayer): Promise<void>;
   setVerifiedOnly(value: boolean): Promise<void>;
 
-  resetSampleData(): Promise<void>;
   refresh(): Promise<void>;
 }
 
@@ -127,13 +124,11 @@ const AppContext = createContext<(AppState & AppActions) | null>(null);
  */
 export function AppProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   // Lazy state, not a ref: these are created once and read during render, so
-  // a ref would be a read-during-render antipattern.
-  const [backend] = useState<BantayBackend>(() =>
-    isSupabaseConfigured() ? createSupabaseBackend() : new LocalBackend(),
-  );
-  const [auth] = useState<BantayAuth>(() =>
-    isSupabaseConfigured() ? createSupabaseAuth() : new LocalAuth(),
-  );
+  // a ref would be a read-during-render antipattern. There is one backend -
+  // Supabase - and no on-device fallback: an account that is not in the
+  // database does not exist.
+  const [backend] = useState<BantayBackend>(createSupabaseBackend);
+  const [auth] = useState<BantayAuth>(createSupabaseAuth);
 
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -163,7 +158,6 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     let cancelled = false;
 
     (async () => {
-      await backend.seedIfEmpty().catch(() => undefined);
       const [snapshot, restored, loadedSettings] = await Promise.all([
         // An unreachable backend must not strand the app on the splash
         // screen: start empty and let the user reach the log-in screen.
@@ -178,14 +172,24 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       setReady(true);
     })();
 
-    // A backend with realtime pushes other devices' changes straight in.
-    const unsubscribe = backend.subscribe?.(() => {
+    // Realtime pushes other devices' changes straight in.
+    const unsubscribe = backend.subscribe(() => {
       void reload();
+    });
+
+    // A session that ends on its own - revoked, expired, account deleted -
+    // signs the app out too, which the route guard turns into the log-in
+    // screen. Otherwise every screen would keep showing a user whose writes
+    // the database then refuses.
+    const stopWatchingSession = auth.onSignedOut(() => {
+      setUser(null);
+      setData((prev) => ({ ...emptySnapshot(), reports: prev.reports, safeSpots: prev.safeSpots }));
     });
 
     return () => {
       cancelled = true;
-      unsubscribe?.();
+      unsubscribe();
+      stopWatchingSession();
     };
   }, [backend, auth, reload]);
 
@@ -246,17 +250,6 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     [auth, reloadForUser],
   );
 
-  const signInWithProvider: AppActions['signInWithProvider'] = useCallback(
-    async (provider) => {
-      const result = await auth.signInWithProvider(provider);
-      if (!result.ok || !result.profile) return result.error ?? 'Sign in failed.';
-      setUser(result.profile);
-      await reloadForUser();
-      return null;
-    },
-    [auth, reloadForUser],
-  );
-
   const selectRole: AppActions['selectRole'] = useCallback(
     async (role) => {
       if (!user) return;
@@ -279,6 +272,11 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
 
   const submitReport: AppActions['submitReport'] = useCallback(
     async (input) => {
+      // Every report is filed by a real account. The insert policy requires
+      // reporter_id to be the caller's own id, so an anonymous report would be
+      // refused by the database anyway - this just says so before trying.
+      if (!user) throw new Error('Log in to report a hazard.');
+
       const report: HazardReport = {
         id: uuid(),
         type: input.type,
@@ -287,8 +285,8 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
         location: input.location,
         addressLabel: input.addressLabel,
         reportedAt: new Date().toISOString(),
-        reporterId: user?.id ?? 'anonymous',
-        reporterName: user?.name ?? 'Anonymous',
+        reporterId: user.id,
+        reporterName: user.name,
         description: input.description,
         photoUri: input.photoUri,
         confirmCount: 0,
@@ -303,9 +301,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       await backend.upsertReport(report);
       setData((prev) => ({ ...prev, reports: [...prev.reports, report] }));
 
-      if (user) {
-        await persistUser({ ...user, reportsSubmitted: user.reportsSubmitted + 1 });
-      }
+      await persistUser({ ...user, reportsSubmitted: user.reportsSubmitted + 1 });
 
       // A hazard on a saved route is worth flagging right away, even before
       // it is verified.
@@ -354,13 +350,16 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
 
   const verifyReport: AppActions['verifyReport'] = useCallback(
     async (reportId) => {
+      // A verification is always attributed to the signed-in official who
+      // made it; there is no unnamed "Barangay Official".
+      if (!user) throw new Error('Log in to verify reports.');
       const current = data.reports.find((r) => r.id === reportId);
       if (!current) return;
 
       const next: HazardReport = {
         ...current,
         status: 'verified',
-        verifiedBy: user ? `${user.name} - ${user.barangay}` : 'Barangay Official',
+        verifiedBy: `${user.name} - ${user.barangay}`,
         verifiedAt: new Date().toISOString(),
       };
       await replaceReport(next);
@@ -379,19 +378,17 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       });
 
       // Tell the reporter, and credit the stats on both sides.
-      if (user && current.reporterId === user.id) {
+      if (current.reporterId === user.id) {
         await persistUser({
           ...user,
           reportsVerified: user.reportsVerified + 1,
           verificationsPerformed: user.verificationsPerformed + 1,
         });
       } else {
-        if (user) {
-          await persistUser({
-            ...user,
-            verificationsPerformed: user.verificationsPerformed + 1,
-          });
-        }
+        await persistUser({
+          ...user,
+          verificationsPerformed: user.verificationsPerformed + 1,
+        });
         await pushAlert({
           id: uuid(),
           kind: 'report_verified',
@@ -411,29 +408,28 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
 
   const rejectReport: AppActions['rejectReport'] = useCallback(
     async (reportId) => {
+      if (!user) throw new Error('Log in to review reports.');
       const current = data.reports.find((r) => r.id === reportId);
       if (!current) return;
 
       await replaceReport({
         ...current,
         status: 'rejected',
-        verifiedBy: user ? `${user.name} - ${user.barangay}` : 'Barangay Official',
+        verifiedBy: `${user.name} - ${user.barangay}`,
         verifiedAt: new Date().toISOString(),
       });
 
-      if (user && current.reporterId === user.id) {
+      if (current.reporterId === user.id) {
         await persistUser({
           ...user,
           reportsRejected: user.reportsRejected + 1,
           verificationsPerformed: user.verificationsPerformed + 1,
         });
       } else {
-        if (user) {
-          await persistUser({
-            ...user,
-            verificationsPerformed: user.verificationsPerformed + 1,
-          });
-        }
+        await persistUser({
+          ...user,
+          verificationsPerformed: user.verificationsPerformed + 1,
+        });
         await pushAlert({
           id: uuid(),
           kind: 'report_rejected',
@@ -570,22 +566,15 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     [],
   );
 
-  const resetSampleData: AppActions['resetSampleData'] = useCallback(async () => {
-    await backend.resetToSeed();
-    await reload();
-  }, [backend, reload]);
-
   const value = useMemo<AppState & AppActions>(
     () => ({
       ready,
-      backendKind: backend.kind,
       user,
       data,
       settings,
       s: translator(settings.language),
       signUp,
       logIn,
-      signInWithProvider,
       selectRole,
       logOut,
       submitReport,
@@ -602,15 +591,13 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       updateSettings,
       toggleLayer,
       setVerifiedOnly,
-      resetSampleData,
       refresh: reload,
     }),
     [
-      ready, backend.kind, user, data, settings, signUp, logIn, signInWithProvider,
-      selectRole, logOut, submitReport, voteOnReport, flagReport, verifyReport,
-      rejectReport, addRoute, deleteRoute, restoreRoute, markAlertRead,
-      markAllAlertsRead, toggleSubscription, updateSettings, toggleLayer,
-      setVerifiedOnly, resetSampleData, reload,
+      ready, user, data, settings, signUp, logIn, selectRole, logOut,
+      submitReport, voteOnReport, flagReport, verifyReport, rejectReport,
+      addRoute, deleteRoute, restoreRoute, markAlertRead, markAllAlertsRead,
+      toggleSubscription, updateSettings, toggleLayer, setVerifiedOnly, reload,
     ],
   );
 
@@ -627,7 +614,7 @@ export function useApp(): AppState & AppActions {
 
 async function loadSettings(): Promise<Settings> {
   try {
-    const raw = await AsyncStorage.getItem('bantay.settings');
+    const raw = await AsyncStorage.getItem(StoreKeys.settings);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<Settings>;
     return { ...DEFAULT_SETTINGS, ...parsed };
@@ -638,10 +625,10 @@ async function loadSettings(): Promise<Settings> {
 
 async function saveSettings(settings: Settings): Promise<void> {
   try {
-    await AsyncStorage.setItem('bantay.settings', JSON.stringify(settings));
+    await AsyncStorage.setItem(StoreKeys.settings, JSON.stringify(settings));
   } catch {
     // A failed settings write is not worth interrupting the user over.
   }
 }
 
-export { StoreKeys, type SafeSpot, type AlertItem };
+export { type SafeSpot, type AlertItem };
