@@ -24,7 +24,7 @@ import {
 } from '../../core/map/mapCamera';
 import { Colors } from '../../core/theme/colors';
 import { MapController } from './useMapController';
-import { OPEN_STREET_MAP, TileSource, tileUrl } from './tileSource';
+import { OPEN_STREET_MAP, TileSource, tileImageSource } from './tileSource';
 
 export type MarkerAnchor = 'bottom-centre' | 'centre';
 
@@ -291,7 +291,7 @@ function TileLayer({
       tiles.push(
         <Image
           key={`${z}/${wrappedX}/${y}`}
-          source={{ uri: tileUrl(source, wrappedX, y, z) }}
+          source={tileImageSource(source, wrappedX, y, z)}
           style={{
             position: 'absolute',
             left: (x * TILE_SIZE - topLeftAtZ.x) * scale,
