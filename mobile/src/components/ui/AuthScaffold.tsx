@@ -43,8 +43,7 @@ export function AuthScaffold({
           <View style={styles.inner}>
             {showLogo && (
               <View style={styles.logo}>
-                <BantayLogo size={62} />
-                <Text style={styles.wordmark}>Bantay</Text>
+                <BantayLogo size={62} wordmark />
               </View>
             )}
             <Text style={styles.title}>{title}</Text>
@@ -128,12 +127,6 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xxl },
   inner: { width: '100%', maxWidth: 440, alignSelf: 'center' },
   logo: { alignItems: 'center', marginBottom: Spacing.xxl },
-  wordmark: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: Colors.brandBlue,
-    marginTop: Spacing.sm,
-  },
   title: { fontSize: 26, fontWeight: '800', color: Colors.ink, letterSpacing: -0.4 },
   subtitle: { fontSize: 14.5, color: Colors.inkMuted, marginTop: Spacing.sm },
   body: { marginTop: Spacing.xxl },

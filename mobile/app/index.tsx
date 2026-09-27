@@ -69,10 +69,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Sized explicitly: the mark is wider than it is tall, so padding alone
+  // would make a pill rather than a circle.
   logoCircle: {
+    width: 144,
+    height: 144,
+    borderRadius: 72,
     backgroundColor: Colors.white,
-    borderRadius: 999,
-    padding: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   wordmark: {
     fontSize: 40,

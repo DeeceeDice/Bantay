@@ -70,7 +70,7 @@ export default function OnboardingScreen(): React.ReactElement {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <BantayLogo size={34} />
+        <BantayLogo size={44} />
         <Text style={styles.brand}>Bantay</Text>
         <View style={styles.spacer} />
         <Pressable onPress={finish} hitSlop={12}>

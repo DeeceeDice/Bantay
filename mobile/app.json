@@ -16,7 +16,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1B4FA0"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.deeceedice.bantay",
       "permissions": [
