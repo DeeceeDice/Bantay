@@ -1,10 +1,11 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Badge, Button, Card, EmptyState } from '../src/components/ui';
 import { Colors, Spacing } from '../src/core/theme/colors';
+import { Alert } from '../src/core/utils/alert';
 import { severityColor } from '../src/core/utils/hazardVisuals';
 import { routePath } from '../src/data/models/types';
 import { statusForRoute } from '../src/data/repositories/logic';

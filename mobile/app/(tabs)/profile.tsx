@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -15,6 +15,7 @@ import {
 } from '../../src/components/ui';
 import { Sheet } from '../../src/components/ui/Sheet';
 import { Colors, Radius, Spacing } from '../../src/core/theme/colors';
+import { Alert } from '../../src/core/utils/alert';
 import { roleLabelKey } from '../../src/core/utils/hazardVisuals';
 import { canVerify } from '../../src/data/models/enums';
 import { initials, trustScore } from '../../src/data/models/types';

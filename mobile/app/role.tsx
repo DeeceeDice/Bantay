@@ -1,12 +1,13 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Badge, Button, StatusBanner } from '../src/components/ui';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { Colors, Radius, Spacing } from '../src/core/theme/colors';
+import { Alert } from '../src/core/utils/alert';
 import { roleDescKey, roleIcon, roleLabelKey } from '../src/core/utils/hazardVisuals';
 import {
   OFFICIAL_ROLES,

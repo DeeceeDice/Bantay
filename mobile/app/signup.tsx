@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AuthScaffold, Field } from '../src/components/ui/AuthScaffold';
 import { Button } from '../src/components/ui';
 import { Colors, Spacing } from '../src/core/theme/colors';
+import { Alert } from '../src/core/utils/alert';
 import { useApp } from '../src/state/appStore';
 
 const EMAIL_RE = /^[\w.+-]+@[\w-]+\.[\w.-]+$/;

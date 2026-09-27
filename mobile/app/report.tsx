@@ -2,7 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BantayMap } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
@@ -12,6 +12,7 @@ import { Field } from '../src/components/ui/AuthScaffold';
 import { PlacementPin } from '../src/components/ui/Pins';
 import { LatLng } from '../src/core/geo/latLng';
 import { Colors, Radius, Spacing } from '../src/core/theme/colors';
+import { Alert } from '../src/core/utils/alert';
 import {
   hazardIcon,
   hazardLabelKey,

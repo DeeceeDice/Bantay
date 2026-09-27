@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BantayMap, MapCircle, MapMarker } from '../../src/components/map/BantayMap';
@@ -12,6 +12,7 @@ import { HazardPin, SafeSpotPin, UserLocationDot } from '../../src/components/ui
 import { Sheet } from '../../src/components/ui/Sheet';
 import { Geo } from '../../src/core/geo/latLng';
 import { Colors, Radius, Shadow, Spacing } from '../../src/core/theme/colors';
+import { Alert } from '../../src/core/utils/alert';
 import {
   hazardLabelKey,
   safeSpotIcon,
