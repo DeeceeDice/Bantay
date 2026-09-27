@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   zoneName: { fontSize: 14, fontWeight: '700', color: Colors.ink },
   zoneCity: { fontSize: 11.5, color: Colors.inkMuted, marginTop: 1 },
   zoneNameOn: { color: Colors.white },
-  error: { fontSize: 12.5, color: Colors.brandRed, marginTop: 5, fontWeight: '600' },
+  error: { fontSize: 12.5, color: Colors.brandRedDark, marginTop: 5, fontWeight: '600' },
   footer: { padding: Spacing.xxl, paddingTop: Spacing.md },
   secondary: { marginTop: Spacing.md },
 });

@@ -113,8 +113,8 @@ docs/           The shared-database contract and the release guide
 
 ## Design
 
-Brand colours are deep red `#C8102E` and blue `#1B4FA0`, from the logo's red
-map-pin pupil inside a blue eye. Orange `#F4772E` and green `#2E9E44` are
+Brand colours are red `#FF3131` and blue `#004AAD`, straight from the logo: a
+red map pin inside a blue eye. Orange `#F4772E` and green `#2E9E44` are
 reserved exclusively for hazard state — pending and verified-safe — so a
 glance at the map is never ambiguous. Tap targets are at least 48dp, because
 this app gets used one-handed, outdoors, in the rain, in a hurry.
