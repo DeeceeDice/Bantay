@@ -5,8 +5,10 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Card, EmptyState } from '../src/components/ui';
 import { HazardPhoto } from '../src/components/ui/HazardPhoto';
 import { Colors, Spacing } from '../src/core/theme/colors';
-import { hazardLabelKey, statusColor } from '../src/core/utils/hazardVisuals';
+import { hazardLabelKey, rejectReasonLabelKey, statusColor } from '../src/core/utils/hazardVisuals';
 import { timeAgoCompact } from '../src/core/utils/timeAgo';
+import { StringKey } from '../src/core/i18n/strings';
+import { ReportStatus } from '../src/data/models/enums';
 import { reportsByUser } from '../src/data/repositories/logic';
 import { useApp } from '../src/state/appStore';
 
@@ -46,21 +48,9 @@ export default function MyReportsScreen(): React.ReactElement {
               </Text>
               <View style={styles.badges}>
                 <Badge
-                  label={
-                    report.status === 'verified'
-                      ? s('verifiedBadge')
-                      : report.status === 'pending'
-                        ? s('pendingBadge')
-                        : s('reject')
-                  }
+                  label={s(STATUS_LABEL[report.status])}
                   color={statusColor(report.status)}
-                  icon={
-                    report.status === 'verified'
-                      ? 'verified'
-                      : report.status === 'pending'
-                        ? 'schedule'
-                        : 'cancel'
-                  }
+                  icon={STATUS_ICON[report.status]}
                   filled={report.status === 'verified'}
                   compact
                 />
@@ -79,6 +69,12 @@ export default function MyReportsScreen(): React.ReactElement {
                   />
                 )}
               </View>
+              {report.status === 'rejected' && report.rejectReason && (
+                <Text style={styles.reason}>
+                  {s(rejectReasonLabelKey(report.rejectReason))}
+                  {report.rejectNote ? ` - ${report.rejectNote}` : ''}
+                </Text>
+              )}
             </View>
           </View>
         </Card>
@@ -87,7 +83,22 @@ export default function MyReportsScreen(): React.ReactElement {
   );
 }
 
+const STATUS_LABEL: Record<ReportStatus, StringKey> = {
+  pending: 'pendingBadge',
+  verified: 'verifiedBadge',
+  rejected: 'rejectedBadge',
+  flagged: 'flaggedBadge',
+};
+
+const STATUS_ICON = {
+  pending: 'schedule',
+  verified: 'verified',
+  rejected: 'cancel',
+  flagged: 'outlined-flag',
+} as const satisfies Record<ReportStatus, string>;
+
 const styles = StyleSheet.create({
+  reason: { fontSize: 12.5, color: Colors.inkMuted, marginTop: Spacing.sm, lineHeight: 18 },
   container: { flex: 1, backgroundColor: Colors.surfaceAlt },
   list: { padding: Spacing.lg, gap: Spacing.md },
   card: { padding: Spacing.lg },

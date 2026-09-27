@@ -3,6 +3,7 @@ import { ComponentProps } from 'react';
 
 import {
   AlertKind,
+  RejectReason,
   HazardSeverity,
   HazardType,
   ReportStatus,
@@ -96,6 +97,7 @@ export const statusColor = (status: ReportStatus): string => {
     case 'verified':
       return Colors.brandRed;
     case 'pending':
+    case 'flagged':
       return Colors.warning;
     default:
       return Colors.inkFaint;
@@ -110,8 +112,10 @@ export const safeSpotIcon = (category: SafeSpotCategory): IconName => {
       return 'school';
     case 'evacuation_center':
       return 'holiday-village';
-    default:
+    case 'terminal':
       return 'directions-bus';
+    default:
+      return 'place';
   }
 };
 
@@ -123,8 +127,10 @@ export const safeSpotLabelKey = (category: SafeSpotCategory): StringKey => {
       return 'categorySchools';
     case 'evacuation_center':
       return 'categoryEvacuation';
-    default:
+    case 'terminal':
       return 'categoryTerminals';
+    default:
+      return 'categoryOther';
   }
 };
 
@@ -140,6 +146,10 @@ export const alertIcon = (kind: AlertKind): IconName => {
       return 'verified';
     case 'report_rejected':
       return 'cancel';
+    case 'broadcast':
+      return 'campaign';
+    case 'account':
+      return 'manage-accounts';
     default:
       return 'alt-route';
   }
@@ -157,6 +167,9 @@ export const alertColor = (kind: AlertKind): string => {
       return Colors.safe;
     case 'report_rejected':
       return Colors.inkMuted;
+    case 'broadcast':
+    case 'account':
+      return Colors.brandBlue;
     default:
       return Colors.warning;
   }
@@ -170,6 +183,8 @@ export const roleLabelKey = (role: UserRole): StringKey => {
       return 'roleBarangay';
     case 'school_admin':
       return 'roleSchoolAdmin';
+    case 'super_admin':
+      return 'roleSuperAdmin';
     default:
       return 'roleBusiness';
   }
@@ -183,6 +198,8 @@ export const roleDescKey = (role: UserRole): StringKey => {
       return 'roleBarangayDesc';
     case 'school_admin':
       return 'roleSchoolAdminDesc';
+    case 'super_admin':
+      return 'roleSuperAdminDesc';
     default:
       return 'roleBusinessDesc';
   }
@@ -196,7 +213,24 @@ export const roleIcon = (role: UserRole): IconName => {
       return 'shield';
     case 'school_admin':
       return 'school';
+    case 'super_admin':
+      return 'admin-panel-settings';
     default:
       return 'storefront';
+  }
+};
+
+export const rejectReasonLabelKey = (reason: RejectReason): StringKey => {
+  switch (reason) {
+    case 'duplicate':
+      return 'reasonDuplicate';
+    case 'false_report':
+      return 'reasonFalseReport';
+    case 'insufficient':
+      return 'reasonInsufficient';
+    case 'outdated':
+      return 'reasonOutdated';
+    default:
+      return 'reasonOther';
   }
 };

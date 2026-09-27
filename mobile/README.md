@@ -31,6 +31,15 @@ spots around Sampaloc, Manila. To stand up your own project, or point your
 machine at another one with `.env`, see
 **[docs/SUPABASE.md](docs/SUPABASE.md)**.
 
+**Shared with Bantay Admin.** The moderation console,
+[Bantay Admin](https://github.com/DeeceeDice/Bantay_Admin), uses the same
+database and the same accounts. Officials are not a role you pick: choosing
+Barangay Official or School Admin files an access request that a super admin
+approves, and the database - not either app - decides who may review, manage
+safe spots or broadcast, and in which zone. What the two apps share, and how
+the console's vocabulary maps onto it, is in
+**[docs/SHARED_DATABASE.md](../docs/SHARED_DATABASE.md)**.
+
 ---
 
 ## What it does

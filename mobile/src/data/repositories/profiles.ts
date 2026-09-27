@@ -20,6 +20,9 @@ export function newProfile(input: { id: string; name: string; email: string }): 
     // Role is chosen on the next screen; commuter is the safe default so a
     // half-finished signup can never grant verification powers.
     role: 'commuter',
+    status: 'active',
+    zoneId: null,
+    homeZoneId: null,
     barangay: 'Sampaloc, Manila',
     reportsSubmitted: 0,
     reportsVerified: 0,

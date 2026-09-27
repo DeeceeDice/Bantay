@@ -41,7 +41,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: 'Brgy. 395 - Kgd. R. Dela Cruz',
       verifiedAt: minutesAgo(now, 11),
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
     {
       id: 'seed-hz-2',
@@ -61,7 +63,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: 'Brgy. 401 - Official',
       verifiedAt: minutesAgo(now, 40),
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
     {
       id: 'seed-hz-3',
@@ -81,7 +85,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: 'Brgy. 468 - Official',
       verifiedAt: minutesAgo(now, 108),
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
     {
       id: 'seed-hz-4',
@@ -101,7 +107,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: 'Brgy. 397 - Official',
       verifiedAt: minutesAgo(now, 29),
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
     {
       id: 'seed-hz-5',
@@ -121,7 +129,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: 'MMDA Liaison',
       verifiedAt: minutesAgo(now, 180),
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
     {
       id: 'seed-hz-6',
@@ -141,7 +151,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: null,
       verifiedAt: null,
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
     {
       id: 'seed-hz-7',
@@ -161,7 +173,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: null,
       verifiedAt: null,
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
     {
       id: 'seed-hz-8',
@@ -181,7 +195,9 @@ export function seedReports(now: Date): HazardReport[] {
       verifiedBy: null,
       verifiedAt: null,
       votedUserIds: [],
-      flaggedUserIds: [],
+      rejectReason: null,
+    rejectNote: null,
+    flaggedUserIds: [],
     },
   ];
 }

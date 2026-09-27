@@ -43,8 +43,8 @@ const COPY = {
   ],
   onboardTitle3: ['Get alerted before you leave', 'Maabisuhan bago ka umalis'],
   onboardBody3: [
-    'Save your daily route and Bantay will warn you when a new hazard blocks it, even over SMS when you are offline.',
-    'I-save ang araw-araw mong ruta at babalaan ka ng Bantay kapag may bagong panganib dito, kahit sa SMS kapag walang internet.',
+    'Save your daily route and Bantay shows you any hazard reported along it.',
+    'I-save ang araw-araw mong ruta at ipapakita ng Bantay ang anumang panganib na na-report dito.',
   ],
 
   logIn: ['Log In', 'Mag-log In'],
@@ -126,14 +126,6 @@ const COPY = {
   showVerifiedOnly: ['Show verified only', 'Beripikado lang'],
   showSafeSpots: ['Show safe spots', 'Ipakita ang ligtas na lugar'],
   showPendingReports: ['Show pending reports', 'Ipakita ang naghihintay'],
-  offlineBanner: [
-    'You are offline. Showing last saved map.',
-    'Offline ka. Ipinapakita ang huling na-save na mapa.',
-  ],
-  offlineSmsExplainer: [
-    'While offline, Bantay still sends critical alerts by SMS to your registered number. Reports you file are queued and uploaded once you are back online.',
-    'Habang offline, nagpapadala pa rin ang Bantay ng mahahalagang alerto sa SMS sa iyong numero. Ang mga report mo ay naka-queue at ia-upload kapag may internet na.',
-  ],
   recenter: ['Recentre', 'Ibalik sa gitna'],
   stillThereQuestion: ['Is this still here?', 'Nandiyan pa ba ito?'],
   confirmations: ['confirmations', 'kumpirmasyon'],
@@ -194,11 +186,6 @@ const COPY = {
   reject: ['Reject', 'Tanggihan'],
   listView: ['List', 'Listahan'],
   mapView: ['Map', 'Mapa'],
-  rejectConfirmTitle: ['Reject this report?', 'Tanggihan ang report?'],
-  rejectConfirmBody: [
-    'It will be removed from the map and the reporter will be notified. This cannot be undone.',
-    'Aalisin ito sa mapa at aabisuhan ang nag-report. Hindi na ito mababawi.',
-  ],
   reportVerifiedToast: [
     'Report verified. It is now live for everyone.',
     'Beripikado na. Live na ito sa lahat.',
@@ -277,17 +264,7 @@ const COPY = {
   reportsVerifiedStat: ['Verified', 'Beripikado'],
   trustScore: ['Trust score', 'Trust score'],
   verificationsDone: ['Verifications', 'Beripikasyon'],
-  notificationPreferences: ['Notification preferences', 'Setting ng abiso'],
-  pushAlerts: ['Push alerts', 'Push alert'],
-  pushAlertsDesc: [
-    'Get notified when a hazard is verified near you.',
-    'Maabisuhan kapag may beripikadong panganib sa malapit.',
-  ],
-  smsFallback: ['SMS fallback', 'SMS fallback'],
-  smsFallbackDesc: [
-    'Receive critical alerts by text when you have no internet.',
-    'Tumanggap ng mahalagang alerto sa text kapag walang internet.',
-  ],
+  notificationPreferences: ['Alerts & settings', 'Alerto at setting'],
   alertRadius: ['Alert radius', 'Alert radius'],
   alertRadiusDesc: [
     'How far from you a hazard must be before Bantay alerts you.',
@@ -305,11 +282,60 @@ const COPY = {
     'Kailangan mong mag-log in ulit para makapag-report.',
   ],
   changeRole: ['Change role', 'Palitan ang role'],
-  resetDoneToast: ['Sample data restored.', 'Naibalik ang sample data.'],
   justNow: ['just now', 'ngayon lang'],
   minAgo: ['min ago', 'min ang nakalipas'],
   hoursAgo: ['hours ago', 'oras ang nakalipas'],
   daysAgo: ['days ago', 'araw ang nakalipas'],
+
+  // Roles, access requests and the admin console
+  roleSuperAdmin: ['Super Admin', 'Super Admin'],
+  roleSuperAdminDesc: [
+    'Oversees every zone from Bantay Admin.',
+    'Namamahala sa lahat ng zone mula sa Bantay Admin.',
+  ],
+  needsApproval: ['Needs approval', 'Kailangan ng approval'],
+  requestAccessTitle: ['Request official access', 'Humiling ng access bilang opisyal'],
+  requestAccessSub: [
+    'A Bantay super admin checks every request before an account can verify reports. Until then you use Bantay as a commuter.',
+    'Sinusuri ng super admin ng Bantay ang bawat request bago makapag-verify ang isang account. Habang hinihintay, commuter ka muna.',
+  ],
+  chooseZone: ['Area you will cover', 'Lugar na sasakupin mo'],
+  zoneRequired: ['Choose the area you will cover.', 'Piliin ang lugar na sasakupin mo.'],
+  organization: ['Barangay or school office', 'Opisina ng barangay o paaralan'],
+  organizationRequired: ['Enter your office.', 'Ilagay ang iyong opisina.'],
+  accessReason: ['Why you need access (optional)', 'Bakit kailangan mo ng access (opsyonal)'],
+  submitRequest: ['Send request', 'Ipadala ang request'],
+  requestSentTitle: ['Request sent', 'Naipadala ang request'],
+  requestSentBody: [
+    'You will get an alert when a super admin decides. Once approved, the same email and password also sign you in to Bantay Admin.',
+    'Makakatanggap ka ng alerto kapag nagdesisyon na ang super admin. Kapag naaprubahan, ang parehong email at password ay magagamit din sa Bantay Admin.',
+  ],
+  requestPending: ['Access request pending', 'Naghihintay ang access request'],
+  requestDenied: ['Access request declined', 'Tinanggihan ang access request'],
+  requestApproved: ['Access approved', 'Naaprubahan ang access'],
+  continueAsCommuter: ['Continue as commuter', 'Magpatuloy bilang commuter'],
+  myArea: ['My area', 'Aking lugar'],
+  myAreaDesc: [
+    'Get broadcasts and verified-hazard alerts for this area.',
+    'Tumanggap ng broadcast at alerto sa beripikadong panganib sa lugar na ito.',
+  ],
+  noAreaChosen: ['Not set', 'Hindi pa napili'],
+  clearArea: ['No area', 'Walang lugar'],
+  accountSuspendedTitle: ['Your account is suspended', 'Suspendido ang iyong account'],
+  accountSuspendedBody: [
+    'You can still see the map, but you cannot report, confirm or flag hazards until a super admin reinstates it.',
+    'Makikita mo pa rin ang mapa, pero hindi ka makakapag-report, makakakumpirma o makakapag-flag hanggang ibalik ito ng super admin.',
+  ],
+  categoryOther: ['Other', 'Iba pa'],
+  flaggedBadge: ['Escalated', 'Na-escalate'],
+  rejectedBadge: ['Not verified', 'Hindi na-verify'],
+  rejectReasonTitle: ['Why are you rejecting this?', 'Bakit mo ito tinatanggihan?'],
+  reasonDuplicate: ['Duplicate of another report', 'Kapareho ng ibang report'],
+  reasonFalseReport: ['False report', 'Maling report'],
+  reasonInsufficient: ['Not enough evidence', 'Kulang ang ebidensya'],
+  reasonOutdated: ['No longer there', 'Wala na roon'],
+  reasonOther: ['Other reason', 'Ibang dahilan'],
+  rejectNote: ['Note to the reporter (optional)', 'Mensahe sa nag-report (opsyonal)'],
 } as const satisfies Record<string, Pair>;
 
 export type StringKey = keyof typeof COPY;

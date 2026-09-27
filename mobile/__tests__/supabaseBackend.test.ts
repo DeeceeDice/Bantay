@@ -42,7 +42,9 @@ function query(table: string) {
   const key = (r: Row): string =>
     table === 'report_votes' || table === 'report_flags'
       ? `${r.report_id}:${r.user_id}`
-      : String(r.id);
+      : table === 'access_requests'
+        ? String(r.user_id) // the one-open-request-per-person unique index
+        : String(r.id);
 
   const run = (): { data: unknown; error: unknown } => {
     if (op === 'select') return { data: matching(), error: null };
@@ -71,6 +73,7 @@ function query(table: string) {
       (op = 'upsert'), (payload = row), (ignoreDuplicates = !!opts?.ignoreDuplicates), builder
     ),
     eq: (k: string, v: unknown) => (filters.push([k, v]), builder),
+    order: () => builder,
     maybeSingle: async () => {
       const { data, error } = run();
       return { data: (data as Row[] | null)?.[0] ?? null, error };
@@ -148,6 +151,8 @@ const report = (overrides: Partial<HazardReport> = {}): HazardReport => ({
   flagCount: 0,
   verifiedBy: null,
   verifiedAt: null,
+  rejectReason: null,
+  rejectNote: null,
   votedUserIds: [],
   flaggedUserIds: [],
   ...overrides,
@@ -271,6 +276,85 @@ describe('SupabaseAuth.onSignedOut', () => {
   });
 });
 
+describe('SupabaseBackend.updateOwnProfile', () => {
+  it('writes only what the owner may change - never role grants, status, zone or statistics', async () => {
+    state.userId = USER;
+    state.tables.profiles = [profileRow(USER)];
+    await createSupabaseBackend().updateOwnProfile(USER, {
+      name: ' Juan ',
+      role: 'business_owner',
+      homeZoneId: 'sampaloc',
+    });
+    expect(state.writes).toEqual([
+      {
+        table: 'profiles',
+        op: 'update',
+        row: { name: 'Juan', role: 'business_owner', home_zone_id: 'sampaloc' },
+      },
+    ]);
+  });
+
+  it('fails loudly when the row was not updated', async () => {
+    state.userId = USER;
+    await expect(
+      createSupabaseBackend().updateOwnProfile(USER, { homeZoneId: null }),
+    ).rejects.toThrow(/could not be updated/);
+  });
+});
+
+describe('SupabaseBackend.submitAccessRequest', () => {
+  const input = {
+    role: 'barangay_official' as const,
+    zoneId: 'sampaloc',
+    organization: ' Brgy. 395 ',
+    reason: ' Kagawad ',
+  };
+
+  it('stores the request for the signed-in account', async () => {
+    state.userId = USER;
+    await createSupabaseBackend().submitAccessRequest(USER, input);
+    expect(state.tables.access_requests).toEqual([
+      expect.objectContaining({
+        user_id: USER,
+        role: 'barangay_official',
+        zone_id: 'sampaloc',
+        organization: 'Brgy. 395',
+        reason: 'Kagawad',
+      }),
+    ]);
+  });
+
+  it('explains the one-open-request rule instead of a database error', async () => {
+    state.userId = USER;
+    const backend = createSupabaseBackend();
+    await backend.submitAccessRequest(USER, input);
+    await expect(backend.submitAccessRequest(USER, input)).rejects.toThrow(
+      /already have a request waiting/,
+    );
+  });
+});
+
+describe('SupabaseBackend.loadAll', () => {
+  it('shows only listed safe spots, and reads zones and access requests', async () => {
+    state.userId = USER;
+    state.tables.safe_spots = [
+      { id: 's1', name: 'Open', category: 'other', lat: 14.6, lng: 120.99, address_label: '', active: true, is_open_now: true },
+      { id: 's2', name: 'Delisted', category: 'mall', lat: 14.6, lng: 120.99, address_label: '', active: false, is_open_now: true },
+    ];
+    state.tables.zones = [
+      { id: 'sampaloc', name: 'Sampaloc', kind: 'barangay', city: 'Manila', center_lat: 14.6, center_lng: 120.99, radius_m: 1800 },
+    ];
+    state.tables.access_requests = [
+      { id: 'r1', role: 'school_admin', zone_id: 'ust', organization: 'UST', reason: '', status: 'denied', submitted_at: '2026-09-27T00:00:00Z', decided_at: null, decision_note: 'Not staff' },
+    ];
+    const snap = await createSupabaseBackend().loadAll();
+    expect(snap.safeSpots.map((s) => s.id)).toEqual(['s1']);
+    expect(snap.safeSpots[0].category).toBe('other');
+    expect(snap.zones[0]).toMatchObject({ id: 'sampaloc', kind: 'barangay', radiusMeters: 1800 });
+    expect(snap.accessRequests[0]).toMatchObject({ status: 'denied', decisionNote: 'Not staff' });
+  });
+});
+
 describe('SupabaseBackend.upsertReport', () => {
   it('inserts a new report', async () => {
     state.userId = USER;
@@ -328,12 +412,33 @@ describe('SupabaseBackend.upsertReport', () => {
     expect(state.tables.reports[0].status).toBe('verified');
   });
 
+  it('sends a rejection with its reason, and nothing the database owns', async () => {
+    state.userId = USER;
+    state.canVerify = true;
+    state.tables.reports = [storedReport()];
+    await createSupabaseBackend().upsertReport(
+      report({
+        status: 'rejected',
+        rejectReason: 'duplicate',
+        rejectNote: 'Same as the Espana report',
+        verifiedBy: 'Spoofed name',
+      }),
+    );
+    expect(state.writes).toEqual([
+      {
+        table: 'reports',
+        op: 'update',
+        row: { status: 'rejected', reject_reason: 'duplicate', reject_note: 'Same as the Espana report' },
+      },
+    ]);
+  });
+
   it('fails loudly when RLS silently refuses a verification', async () => {
     state.userId = USER;
     state.tables.reports = [storedReport()];
     await expect(
       createSupabaseBackend().upsertReport(report({ status: 'verified', verifiedBy: 'Me' })),
-    ).rejects.toThrow(/officials/);
+    ).rejects.toThrow(/Only officials can review/)
     expect(state.tables.reports[0].status).toBe('pending');
   });
 });

@@ -20,7 +20,7 @@ import { useApp } from '../../src/state/appStore';
  * about the roads they actually travel.
  */
 export default function AlertsScreen(): React.ReactElement {
-  const { s, data, settings, markAlertRead, markAllAlertsRead } = useApp();
+  const { s, data, markAlertRead, markAllAlertsRead } = useApp();
   const [routesOnly, setRoutesOnly] = useState(false);
 
   const all = sortedAlerts(data.alerts);
@@ -33,6 +33,9 @@ export default function AlertsScreen(): React.ReactElement {
       router.push({ pathname: '/(tabs)', params: { focusReport: alert.reportId } });
     } else if (alert.safeSpotId) {
       router.push({ pathname: '/(tabs)', params: { focusSpot: alert.safeSpotId } });
+    } else if (alert.kind === 'account') {
+      // Access decisions and suspensions: the profile shows where you stand.
+      router.push('/(tabs)/profile');
     }
   };
 
@@ -65,13 +68,6 @@ export default function AlertsScreen(): React.ReactElement {
           </Pressable>
         ))}
       </View>
-
-      {settings.smsFallbackEnabled && (
-        <View style={styles.smsNotice}>
-          <MaterialIcons name="sms" size={18} color={Colors.brandBlueDark} />
-          <Text style={styles.smsText}>{s('offlineSmsExplainer')}</Text>
-        </View>
-      )}
 
       {visible.length === 0 ? (
         <EmptyState
@@ -152,22 +148,6 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: Colors.brandBlueLight },
   segmentText: { fontSize: 13.5, fontWeight: '600', color: Colors.inkMuted },
   segmentTextActive: { color: Colors.brandBlueDark, fontWeight: '700' },
-  smsNotice: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: Colors.brandBlueLight,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
-  smsText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 17,
-    color: Colors.brandBlueDark,
-    marginLeft: Spacing.sm,
-  },
   list: { padding: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.md },
   card: { padding: Spacing.lg },
   cardRow: { flexDirection: 'row' },

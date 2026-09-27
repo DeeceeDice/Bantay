@@ -1,4 +1,13 @@
-import { AlertItem, HazardReport, SafeSpot, SavedRoute, UserProfile } from '../models/types';
+import { OfficialRole, SelfServiceRole } from '../models/enums';
+import {
+  AccessRequest,
+  AlertItem,
+  HazardReport,
+  SafeSpot,
+  SavedRoute,
+  UserProfile,
+  Zone,
+} from '../models/types';
 
 /** Everything the app reads on startup, in one round trip. */
 export interface Snapshot {
@@ -7,6 +16,9 @@ export interface Snapshot {
   routes: SavedRoute[];
   alerts: AlertItem[];
   subscribedSpotIds: string[];
+  zones: Zone[];
+  /** The signed-in user's own access requests, newest first. */
+  accessRequests: AccessRequest[];
 }
 
 export const emptySnapshot = (): Snapshot => ({
@@ -15,7 +27,28 @@ export const emptySnapshot = (): Snapshot => ({
   routes: [],
   alerts: [],
   subscribedSpotIds: [],
+  zones: [],
+  accessRequests: [],
 });
+
+/**
+ * The parts of a profile its owner may change. Role here is only ever a
+ * self-service role; everything else on the profile - official roles, zone,
+ * status, statistics - is written by the database or a super admin, and the
+ * database refuses a client that tries.
+ */
+export interface OwnProfilePatch {
+  name?: string;
+  role?: SelfServiceRole;
+  homeZoneId?: string | null;
+}
+
+export interface AccessRequestInput {
+  role: OfficialRole;
+  zoneId: string;
+  organization: string;
+  reason: string;
+}
 
 /**
  * The persistence seam.
@@ -35,7 +68,8 @@ export interface BantayBackend {
   replaceAlerts(alerts: AlertItem[]): Promise<void>;
   addAlert(alert: AlertItem): Promise<void>;
   setSubscribedSpots(spotIds: string[]): Promise<void>;
-  upsertProfile(profile: UserProfile): Promise<void>;
+  updateOwnProfile(userId: string, patch: OwnProfilePatch): Promise<void>;
+  submitAccessRequest(userId: string, input: AccessRequestInput): Promise<void>;
 
   /**
    * Notifies when another device changes shared data. Returns an unsubscribe
@@ -94,8 +128,6 @@ export interface BantayAuth {
   }): Promise<AuthResult>;
 
   logIn(input: { email: string; password: string }): Promise<AuthResult>;
-
-  updateProfile(profile: UserProfile): Promise<void>;
 
   logOut(): Promise<void>;
 

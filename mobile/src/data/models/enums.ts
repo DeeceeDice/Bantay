@@ -11,12 +11,30 @@ export const USER_ROLES = [
   'barangay_official',
   'school_admin',
   'business_owner',
+  'super_admin',
 ] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+/** Roles anyone can pick for themselves. */
+export const SELF_SERVICE_ROLES = ['commuter', 'business_owner'] as const;
+export type SelfServiceRole = (typeof SELF_SERVICE_ROLES)[number];
+
+/**
+ * Roles that carry verification powers. They are granted by a super admin
+ * approving an access request - the database refuses a self-granted one.
+ */
+export const OFFICIAL_ROLES = ['barangay_official', 'school_admin'] as const;
+export type OfficialRole = (typeof OFFICIAL_ROLES)[number];
+
+export const isSelfServiceRole = (role: UserRole): role is SelfServiceRole =>
+  (SELF_SERVICE_ROLES as readonly string[]).includes(role);
+
 /** Roles allowed to verify or reject community reports. */
 export const canVerify = (role: UserRole): boolean =>
-  role === 'barangay_official' || role === 'school_admin';
+  role === 'barangay_official' || role === 'school_admin' || role === 'super_admin';
+
+export const USER_STATUSES = ['active', 'suspended'] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
 
 export const HAZARD_TYPES = [
   'flooded_road',
@@ -42,14 +60,33 @@ export const severityRank: Record<HazardSeverity, number> = {
   life_threatening: 3,
 };
 
-export const REPORT_STATUSES = ['pending', 'verified', 'rejected'] as const;
+/**
+ * `flagged` is an escalation from an official to a super admin: still
+ * unconfirmed, so it reads as awaiting review everywhere in this app.
+ */
+export const REPORT_STATUSES = ['pending', 'verified', 'rejected', 'flagged'] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+/** Still waiting on an official's decision. */
+export const isAwaitingReview = (status: ReportStatus): boolean =>
+  status === 'pending' || status === 'flagged';
+
+/** Why a report was rejected. Required by the database for every rejection. */
+export const REJECT_REASONS = [
+  'duplicate',
+  'false_report',
+  'insufficient',
+  'outdated',
+  'other',
+] as const;
+export type RejectReason = (typeof REJECT_REASONS)[number];
 
 export const SAFE_SPOT_CATEGORIES = [
   'mall',
   'school',
   'evacuation_center',
   'terminal',
+  'other',
 ] as const;
 export type SafeSpotCategory = (typeof SAFE_SPOT_CATEGORIES)[number];
 
@@ -60,8 +97,18 @@ export const ALERT_KINDS = [
   'report_verified',
   'report_rejected',
   'route_status',
+  /** An announcement sent by an official or super admin. */
+  'broadcast',
+  /** An access request was decided, or the account's role or status changed. */
+  'account',
 ] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
+
+export const ZONE_KINDS = ['barangay', 'school'] as const;
+export type ZoneKind = (typeof ZONE_KINDS)[number];
+
+export const ACCESS_REQUEST_STATUSES = ['pending', 'approved', 'denied'] as const;
+export type AccessRequestStatus = (typeof ACCESS_REQUEST_STATUSES)[number];
 
 /** Which pin layers the map is currently showing. */
 export const MAP_LAYERS = [

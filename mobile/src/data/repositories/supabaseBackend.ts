@@ -3,25 +3,34 @@ import * as Linking from 'expo-linking';
 
 import { latLng } from '../../core/geo/latLng';
 import {
+  ACCESS_REQUEST_STATUSES,
   ALERT_KINDS,
   HAZARD_SEVERITIES,
   HAZARD_TYPES,
+  OFFICIAL_ROLES,
+  REJECT_REASONS,
   REPORT_STATUSES,
   SAFE_SPOT_CATEGORIES,
   USER_ROLES,
+  USER_STATUSES,
+  ZONE_KINDS,
   parseEnum,
 } from '../models/enums';
 import {
+  AccessRequest,
   AlertItem,
   HazardReport,
   SafeSpot,
   SavedRoute,
   UserProfile,
+  Zone,
 } from '../models/types';
 import {
+  AccessRequestInput,
   AuthResult,
   BantayAuth,
   BantayBackend,
+  OwnProfilePatch,
   Snapshot,
   authConfirmEmail,
   authFail,
@@ -53,6 +62,9 @@ interface ReportRow {
   photo_uri: string | null;
   verified_by: string | null;
   verified_at: string | null;
+  /** Written only by a review; absent from the rows the app inserts. */
+  reject_reason?: string | null;
+  reject_note?: string | null;
 }
 
 interface VoteRow {
@@ -90,6 +102,8 @@ function toReport(
     flagCount: myFlags.length,
     verifiedBy: row.verified_by,
     verifiedAt: row.verified_at,
+    rejectReason: row.reject_reason ? parseEnum(REJECT_REASONS, row.reject_reason, 'other') : null,
+    rejectNote: row.reject_note ?? null,
     votedUserIds: mine.map((v) => v.user_id),
     flaggedUserIds: myFlags.map((f) => f.user_id),
   };
@@ -198,6 +212,9 @@ interface ProfileRow {
   name: string;
   email: string;
   role: string;
+  status?: string;
+  zone_id?: string | null;
+  home_zone_id?: string | null;
   barangay: string;
   reports_submitted: number;
   reports_verified: number;
@@ -215,6 +232,9 @@ const toProfile = (row: ProfileRow): UserProfile => ({
   name: row.name,
   email: row.email,
   role: parseEnum(USER_ROLES, row.role, 'commuter'),
+  status: parseEnum(USER_STATUSES, row.status, 'active'),
+  zoneId: row.zone_id ?? null,
+  homeZoneId: row.home_zone_id ?? null,
   barangay: row.barangay,
   reportsSubmitted: row.reports_submitted,
   reportsVerified: row.reports_verified,
@@ -241,6 +261,49 @@ const fromProfile = (p: UserProfile): ProfileRow => ({
   area_center_lat: p.areaCenter.lat,
   area_center_lng: p.areaCenter.lng,
   area_radius_meters: p.areaRadiusMeters,
+});
+
+interface ZoneRow {
+  id: string;
+  name: string;
+  kind: string;
+  city: string;
+  center_lat: number;
+  center_lng: number;
+  radius_m: number;
+}
+
+const toZone = (row: ZoneRow): Zone => ({
+  id: row.id,
+  name: row.name,
+  kind: parseEnum(ZONE_KINDS, row.kind, 'barangay'),
+  city: row.city,
+  center: latLng(row.center_lat, row.center_lng),
+  radiusMeters: row.radius_m,
+});
+
+interface AccessRequestRow {
+  id: string;
+  role: string;
+  zone_id: string | null;
+  organization: string;
+  reason: string;
+  status: string;
+  submitted_at: string;
+  decided_at: string | null;
+  decision_note: string | null;
+}
+
+const toAccessRequest = (row: AccessRequestRow): AccessRequest => ({
+  id: row.id,
+  role: parseEnum(OFFICIAL_ROLES, row.role, 'barangay_official'),
+  zoneId: row.zone_id,
+  organization: row.organization,
+  reason: row.reason,
+  status: parseEnum(ACCESS_REQUEST_STATUSES, row.status, 'pending'),
+  submittedAt: row.submitted_at,
+  decidedAt: row.decided_at,
+  decisionNote: row.decision_note,
 });
 
 /* ---------------------------------------------------------------------- */
@@ -282,17 +345,23 @@ class SupabaseBackend implements BantayBackend {
 
   async loadAll(): Promise<Snapshot> {
     const db = supabase();
-    const [reports, votes, flags, safeSpots, routes, alerts, subs] = await Promise.all([
-      db.from('reports').select('*'),
-      db.from('report_votes').select('*'),
-      db.from('report_flags').select('*'),
-      db.from('safe_spots').select('*'),
-      db.from('routes').select('*'),
-      db.from('alerts').select('*'),
-      db.from('spot_subscriptions').select('spot_id'),
-    ]);
+    const [reports, votes, flags, safeSpots, routes, alerts, subs, zones, requests] =
+      await Promise.all([
+        db.from('reports').select('*'),
+        db.from('report_votes').select('*'),
+        db.from('report_flags').select('*'),
+        // Officials can also read spots an admin has delisted; this app only
+        // ever shows the listed ones.
+        db.from('safe_spots').select('*').eq('active', true),
+        db.from('routes').select('*'),
+        db.from('alerts').select('*'),
+        db.from('spot_subscriptions').select('spot_id'),
+        db.from('zones').select('*').order('name'),
+        // Row Level Security returns only the caller's own requests.
+        db.from('access_requests').select('*').order('submitted_at', { ascending: false }),
+      ]);
 
-    const firstError = [reports, votes, flags, safeSpots, routes, alerts, subs].find(
+    const firstError = [reports, votes, flags, safeSpots, routes, alerts, subs, zones, requests].find(
       (r) => r.error,
     )?.error;
     if (firstError) throw new Error(firstError.message);
@@ -308,6 +377,8 @@ class SupabaseBackend implements BantayBackend {
       routes: ((routes.data ?? []) as RouteRow[]).map(toRoute),
       alerts: ((alerts.data ?? []) as AlertRow[]).map(toAlert),
       subscribedSpotIds: ((subs.data ?? []) as { spot_id: string }[]).map((s) => s.spot_id),
+      zones: ((zones.data ?? []) as ZoneRow[]).map(toZone),
+      accessRequests: ((requests.data ?? []) as AccessRequestRow[]).map(toAccessRequest),
     };
   }
 
@@ -317,7 +388,10 @@ class SupabaseBackend implements BantayBackend {
    * is split by what actually moved:
    *
    * - a report that does not exist yet is inserted (as its reporter);
-   * - a change of status is a verification, written only by an official;
+   * - a change of status is a review, written only by an official in whose
+   *   zone the report lies. The database records who reviewed it and when,
+   *   and tells the reporter; the app sends only the outcome and, for a
+   *   rejection, the reason;
    * - a new vote or flag goes into its own table, never the report row.
    *
    * Writing the whole row every time, as an upsert, turned every vote by a
@@ -330,7 +404,7 @@ class SupabaseBackend implements BantayBackend {
 
     const existing = await db
       .from('reports')
-      .select('status, verified_by')
+      .select('status')
       .eq('id', report.id)
       .maybeSingle();
     if (existing.error) throw new Error(existing.error.message);
@@ -341,22 +415,24 @@ class SupabaseBackend implements BantayBackend {
       return;
     }
 
-    const row = existing.data as Pick<ReportRow, 'status' | 'verified_by'>;
-    if (row.status !== report.status || row.verified_by !== report.verifiedBy) {
+    const row = existing.data as Pick<ReportRow, 'status'>;
+    if (row.status !== report.status) {
       const { data, error } = await db
         .from('reports')
         .update({
           status: report.status,
-          verified_by: report.verifiedBy,
-          verified_at: report.verifiedAt,
+          reject_reason: report.status === 'rejected' ? report.rejectReason : null,
+          reject_note: report.status === 'rejected' ? report.rejectNote : null,
         })
         .eq('id', report.id)
         .select('id');
       if (error) throw new Error(error.message);
       // An update that RLS filters out is not an error, just zero rows. Left
-      // unchecked, the verification would appear to work and never happen.
+      // unchecked, the review would appear to work and never happen.
       if (!data || data.length === 0) {
-        throw new Error('Only barangay officials and school admins can verify reports.');
+        throw new Error(
+          'Only officials can review reports, and only inside their assigned zone.',
+        );
       }
     }
 
@@ -465,9 +541,35 @@ class SupabaseBackend implements BantayBackend {
     }
   }
 
-  async upsertProfile(profile: UserProfile): Promise<void> {
-    const { error } = await supabase().from('profiles').upsert(fromProfile(profile));
+  async updateOwnProfile(userId: string, patch: OwnProfilePatch): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.name = patch.name.trim();
+    if (patch.role !== undefined) row.role = patch.role;
+    if (patch.homeZoneId !== undefined) row.home_zone_id = patch.homeZoneId;
+    if (Object.keys(row).length === 0) return;
+
+    const { data, error } = await supabase()
+      .from('profiles')
+      .update(row)
+      .eq('id', userId)
+      .select('id');
     if (error) throw new Error(error.message);
+    if (!data || data.length === 0) throw new Error('Your profile could not be updated.');
+  }
+
+  async submitAccessRequest(userId: string, input: AccessRequestInput): Promise<void> {
+    const { error } = await supabase().from('access_requests').insert({
+      user_id: userId,
+      role: input.role,
+      zone_id: input.zoneId,
+      organization: input.organization.trim(),
+      reason: input.reason.trim(),
+    });
+    if (!error) return;
+    if (error.code === UNIQUE_VIOLATION) {
+      throw new Error('You already have a request waiting for review.');
+    }
+    throw new Error(error.message);
   }
 
   /**
@@ -604,11 +706,6 @@ class SupabaseAuth implements BantayAuth {
     } catch (e) {
       return authFail(e instanceof Error ? e.message : 'Could not load your profile.');
     }
-  }
-
-  async updateProfile(profile: UserProfile): Promise<void> {
-    const { error } = await supabase().from('profiles').upsert(fromProfile(profile));
-    if (error) throw new Error(error.message);
   }
 
   async logOut(): Promise<void> {

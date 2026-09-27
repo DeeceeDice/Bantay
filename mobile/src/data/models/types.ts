@@ -1,11 +1,16 @@
 import { LatLng } from '../../core/geo/latLng';
 import {
+  AccessRequestStatus,
   AlertKind,
   HazardSeverity,
   HazardType,
+  OfficialRole,
+  RejectReason,
   ReportStatus,
   SafeSpotCategory,
   UserRole,
+  UserStatus,
+  ZoneKind,
 } from './enums';
 
 /**
@@ -34,6 +39,9 @@ export interface HazardReport {
   flagCount: number;
   verifiedBy: string | null;
   verifiedAt: string | null;
+  /** Set when the report was rejected. */
+  rejectReason: RejectReason | null;
+  rejectNote: string | null;
   /** Users who already voted, so the UI can stop double counting. */
   votedUserIds: string[];
   flaggedUserIds: string[];
@@ -45,6 +53,12 @@ export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
+  /** A suspended account can read the map but not report, vote or flag. */
+  status: UserStatus;
+  /** The zone an official reviews. Assigned by a super admin. */
+  zoneId: string | null;
+  /** The area whose broadcasts and verified-hazard alerts this person gets. */
+  homeZoneId: string | null;
   /** Assigned area. Officials only see pending reports inside their area. */
   barangay: string;
   reportsSubmitted: number;
@@ -60,6 +74,29 @@ export interface UserProfile {
    */
   areaCenter: LatLng;
   areaRadiusMeters: number;
+}
+
+/** A barangay or school zone an official is responsible for. */
+export interface Zone {
+  id: string;
+  name: string;
+  kind: ZoneKind;
+  city: string;
+  center: LatLng;
+  radiusMeters: number;
+}
+
+/** A request to be made an official, decided by a super admin. */
+export interface AccessRequest {
+  id: string;
+  role: OfficialRole;
+  zoneId: string | null;
+  organization: string;
+  reason: string;
+  status: AccessRequestStatus;
+  submittedAt: string;
+  decidedAt: string | null;
+  decisionNote: string | null;
 }
 
 /** A verified place people can shelter in. */

@@ -21,6 +21,7 @@ import {
   statusColor,
 } from '../../src/core/utils/hazardVisuals';
 import { timeAgo } from '../../src/core/utils/timeAgo';
+import { isAwaitingReview } from '../../src/data/models/enums';
 import { SafetyCheckResult } from '../../src/data/models/types';
 import { checkSafety } from '../../src/data/repositories/logic';
 import { DEFAULT_CENTER } from '../../src/data/seed/seedData';
@@ -156,7 +157,7 @@ export default function MapScreen(): React.ReactElement {
     };
 
     if (settings.layers.includes('pending_reports')) {
-      data.reports.filter((r) => r.status === 'pending').forEach((r) => pushHazard(r.id));
+      data.reports.filter((r) => isAwaitingReview(r.status)).forEach((r) => pushHazard(r.id));
     }
     // Verified hazards last so they paint above pending ones: a confirmed
     // danger must never be hidden behind an unconfirmed report.
@@ -201,8 +202,7 @@ export default function MapScreen(): React.ReactElement {
   const selectedSpot = data.safeSpots.find((sp) => sp.id === selectedSpotId) ?? null;
   const activeFilters =
     (!settings.layers.includes('pending_reports') ? 1 : 0) +
-    (!settings.layers.includes('safe_spots') ? 1 : 0) +
-    (settings.offlineMode ? 1 : 0);
+    (!settings.layers.includes('safe_spots') ? 1 : 0);
 
   return (
     <View style={styles.container}>
@@ -268,13 +268,13 @@ export default function MapScreen(): React.ReactElement {
           </View>
         )}
 
-        {settings.offlineMode ? (
+        {user?.status === 'suspended' ? (
           <View style={styles.bannerWrap}>
             <StatusBanner
-              icon="wifi-off"
-              title={s('offlineBanner')}
-              message={s('offlineSmsExplainer')}
-              color={Colors.inkMuted}
+              icon="block"
+              title={s('accountSuspendedTitle')}
+              message={s('accountSuspendedBody')}
+              color={Colors.brandRed}
             />
           </View>
         ) : (
@@ -557,11 +557,6 @@ export default function MapScreen(): React.ReactElement {
           label={s('showSafeSpots')}
           value={settings.layers.includes('safe_spots')}
           onToggle={() => void app.toggleLayer('safe_spots')}
-        />
-        <FilterRow
-          label={s('offlineBanner')}
-          value={settings.offlineMode}
-          onToggle={(v) => void app.updateSettings({ offlineMode: v })}
         />
         <Button label={s('done')} onPress={() => setFiltersOpen(false)} style={styles.sheetAction} />
       </Sheet>

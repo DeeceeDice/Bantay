@@ -1,19 +1,22 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Badge, Button, Card, EmptyState } from '../src/components/ui';
+import { Field } from '../src/components/ui/AuthScaffold';
+import { Sheet } from '../src/components/ui/Sheet';
 import { HazardPhoto } from '../src/components/ui/HazardPhoto';
 import { Geo } from '../src/core/geo/latLng';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import {
   hazardLabelKey,
+  rejectReasonLabelKey,
   severityColor,
   severityIcon,
   severityLabelKey,
 } from '../src/core/utils/hazardVisuals';
 import { timeAgoCompact } from '../src/core/utils/timeAgo';
-import { canVerify } from '../src/data/models/enums';
+import { REJECT_REASONS, RejectReason, canVerify } from '../src/data/models/enums';
 import { pendingForOfficial } from '../src/data/repositories/logic';
 import { useApp } from '../src/state/appStore';
 
@@ -27,6 +30,11 @@ import { useApp } from '../src/state/appStore';
 export default function VerificationScreen(): React.ReactElement {
   const { s, user, data, verifyReport, rejectReport } = useApp();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The report being rejected, and why. A reason is required: the database
+  // refuses a rejection without one, and it is what the reporter is told.
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [reason, setReason] = useState<RejectReason | null>(null);
+  const [note, setNote] = useState('');
 
   if (!user || !canVerify(user.role)) {
     return (
@@ -42,26 +50,26 @@ export default function VerificationScreen(): React.ReactElement {
   const pending = pendingForOfficial(data.reports, user);
 
   const confirmReject = (reportId: string): void => {
-    Alert.alert(s('rejectConfirmTitle'), s('rejectConfirmBody'), [
-      { text: s('cancel'), style: 'cancel' },
-      {
-        text: s('reject'),
-        style: 'destructive',
-        onPress: () => {
-          setBusyId(reportId);
-          void rejectReport(reportId).then(
-            () => {
-              setBusyId(null);
-              Alert.alert(s('reportRejectedToast'));
-            },
-            (error: unknown) => {
-              setBusyId(null);
-              Alert.alert(s('somethingWentWrong'), error instanceof Error ? error.message : String(error));
-            },
-          );
-        },
+    setRejectingId(reportId);
+    setReason(null);
+    setNote('');
+  };
+
+  const submitReject = (): void => {
+    const reportId = rejectingId;
+    if (!reportId || !reason) return;
+    setRejectingId(null);
+    setBusyId(reportId);
+    void rejectReport(reportId, reason, note).then(
+      () => {
+        setBusyId(null);
+        Alert.alert(s('reportRejectedToast'));
       },
-    ]);
+      (error: unknown) => {
+        setBusyId(null);
+        Alert.alert(s('somethingWentWrong'), error instanceof Error ? error.message : String(error));
+      },
+    );
   };
 
   return (
@@ -172,11 +180,46 @@ export default function VerificationScreen(): React.ReactElement {
           ))}
         </ScrollView>
       )}
+      <Sheet visible={rejectingId !== null} onClose={() => setRejectingId(null)}>
+        <Text style={styles.sheetTitle}>{s('rejectReasonTitle')}</Text>
+        {REJECT_REASONS.map((r) => {
+          const on = reason === r;
+          return (
+            <Pressable
+              key={r}
+              onPress={() => setReason(r)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
+              style={styles.reasonRow}
+            >
+              <MaterialIcons
+                name={on ? 'radio-button-checked' : 'radio-button-unchecked'}
+                size={22}
+                color={on ? Colors.brandRed : Colors.inkFaint}
+              />
+              <Text style={styles.reasonText}>{s(rejectReasonLabelKey(r))}</Text>
+            </Pressable>
+          );
+        })}
+        <View style={styles.noteWrap}>
+          <Field label={s('rejectNote')} value={note} onChangeText={setNote} maxLength={300} multiline />
+        </View>
+        <Button
+          label={s('reject')}
+          color={Colors.brandRed}
+          disabled={!reason}
+          onPress={submitReject}
+        />
+      </Sheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: Colors.ink, marginBottom: Spacing.md },
+  reasonRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
+  reasonText: { fontSize: 15, color: Colors.ink, marginLeft: Spacing.md },
+  noteWrap: { marginTop: Spacing.md },
   container: { flex: 1, backgroundColor: Colors.surfaceAlt },
   areaHeader: {
     flexDirection: 'row',

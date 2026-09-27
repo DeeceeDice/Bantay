@@ -142,3 +142,50 @@ jobs:
           name: bantay-rn-bundle
           path: mobile/dist
           retention-days: 14
+
+  database:
+    name: Database rules (Postgres)
+    runs-on: ubuntu-24.04
+    # Bantay and Bantay Admin share one database, and everything that decides
+    # who may do what lives in it - so it is tested as a client would meet
+    # it: as the `authenticated` role, with a JWT, against real Postgres.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bantay_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: bantay_test
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Apply the Supabase stand-in, every migration, then the seed
+        run: |
+          psql -v ON_ERROR_STOP=1 -q -f supabase/tests/supabase_stub.sql
+          for f in supabase/migrations/*.sql; do
+            echo "applying $f"
+            psql -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+          psql -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
+
+      # Deploys can apply a migration more than once, so each must be safe to
+      # re-run over itself.
+      - name: Re-apply every migration
+        run: |
+          for f in supabase/migrations/*.sql; do
+            psql -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      - name: Check the rules
+        run: python3 supabase/tests/rules_test.py

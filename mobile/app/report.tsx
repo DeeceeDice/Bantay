@@ -6,7 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { BantayMap } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
-import { Button } from '../src/components/ui';
+import { Button, StatusBanner } from '../src/components/ui';
 import { HazardPhoto } from '../src/components/ui/HazardPhoto';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { PlacementPin } from '../src/components/ui/Pins';
@@ -39,7 +39,7 @@ const MAX_DESCRIPTION = 140;
  * and the Next button can reflect whether the current step is complete.
  */
 export default function ReportScreen(): React.ReactElement {
-  const { s, submitReport } = useApp();
+  const { s, user, submitReport } = useApp();
   const location = useUserLocation();
 
   const [step, setStep] = useState(0);
@@ -52,6 +52,21 @@ export default function ReportScreen(): React.ReactElement {
 
   const controller = useMapController({ center: location.current, zoom: 17 });
   const addressLabel = describePoint(point);
+
+  // The database refuses a suspended account's report; say so up front
+  // rather than after four steps of filling it in.
+  if (user?.status === 'suspended') {
+    return (
+      <View style={styles.suspended}>
+        <StatusBanner
+          icon="block"
+          title={s('accountSuspendedTitle')}
+          message={s('accountSuspendedBody')}
+          color={Colors.brandRed}
+        />
+      </View>
+    );
+  }
 
   const canAdvance =
     step === 0 ? true : step === 1 ? !!type : step === 2 ? !!severity : !!photoUri;
@@ -340,6 +355,7 @@ function OptionCard({
 }
 
 const styles = StyleSheet.create({
+  suspended: { flex: 1, padding: Spacing.lg, backgroundColor: Colors.surfaceAlt },
   container: { flex: 1, backgroundColor: Colors.surface },
   flex: { flex: 1 },
   progress: {

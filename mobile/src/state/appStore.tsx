@@ -10,7 +10,7 @@ import React, {
 
 import { LatLng } from '../core/geo/latLng';
 import { Language, Translate, translator } from '../core/i18n/strings';
-import { MapLayer } from '../data/models/enums';
+import { MapLayer, RejectReason, SelfServiceRole } from '../data/models/enums';
 import {
   AlertItem,
   HazardReport,
@@ -19,34 +19,33 @@ import {
   UserProfile,
 } from '../data/models/types';
 import { uuid } from '../core/utils/uuid';
-import { BantayAuth, BantayBackend, Snapshot, emptySnapshot } from '../data/repositories/backend';
 import {
-  applyFlag,
-  applyVote,
-  hazardTitle,
-  isOnAnySavedRoute,
-  routeContaining,
-} from '../data/repositories/logic';
+  AccessRequestInput,
+  BantayAuth,
+  BantayBackend,
+  Snapshot,
+  emptySnapshot,
+} from '../data/repositories/backend';
+import { applyFlag, applyVote, routeContaining } from '../data/repositories/logic';
 import { StoreKeys } from '../data/repositories/storeKeys';
 import { createSupabaseAuth, createSupabaseBackend } from '../data/repositories/supabaseBackend';
 
+/*
+ * Only settings that change something. There is no push-notification or SMS
+ * delivery behind Bantay, so there are no switches pretending to control
+ * them: alerts arrive in the app, live, while it is open.
+ */
 export interface Settings {
   language: Language;
-  pushEnabled: boolean;
-  smsFallbackEnabled: boolean;
   alertRadiusKm: number;
   locationGranted: boolean;
-  offlineMode: boolean;
   layers: MapLayer[];
 }
 
 const DEFAULT_SETTINGS: Settings = {
   language: 'en',
-  pushEnabled: true,
-  smsFallbackEnabled: true,
   alertRadiusKm: 2,
   locationGranted: false,
-  offlineMode: false,
   layers: ['verified_hazards', 'pending_reports', 'safe_spots'],
 };
 
@@ -71,7 +70,16 @@ export interface AppActions {
     password: string;
   }): Promise<{ error: string | null; confirmEmail: boolean }>;
   logIn(input: { email: string; password: string }): Promise<string | null>;
-  selectRole(role: UserProfile['role']): Promise<void>;
+  /** Commuter or business owner: yours to choose. */
+  selectRole(role: SelfServiceRole): Promise<void>;
+  /**
+   * Official roles are requested, not chosen. The request is stored in the
+   * database and decided by a super admin in Bantay Admin; approval changes
+   * the role of this same account.
+   */
+  requestAccess(input: AccessRequestInput): Promise<void>;
+  /** The area whose broadcasts and verified-hazard alerts you receive. */
+  setHomeZone(zoneId: string | null): Promise<void>;
   logOut(): Promise<void>;
 
   // Reports
@@ -86,7 +94,7 @@ export interface AppActions {
   voteOnReport(reportId: string, confirms: boolean): Promise<void>;
   flagReport(reportId: string): Promise<void>;
   verifyReport(reportId: string): Promise<void>;
-  rejectReport(reportId: string): Promise<void>;
+  rejectReport(reportId: string, reason: RejectReason, note: string): Promise<void>;
 
   // Routes
   addRoute(input: {
@@ -112,6 +120,9 @@ export interface AppActions {
   refresh(): Promise<void>;
 }
 
+const SUSPENDED_MESSAGE =
+  'Your account is suspended. You can still see the map, but you cannot report, confirm or flag hazards until a super admin reinstates it.';
+
 const AppContext = createContext<(AppState & AppActions) | null>(null);
 
 /**
@@ -135,9 +146,21 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   const [data, setData] = useState<Snapshot>(emptySnapshot());
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
+  /**
+   * The profile is re-read rather than updated in place: its role, zone,
+   * status and statistics are written by the database (a review, an approval,
+   * a suspension), often from the admin console, so the server's copy is the
+   * only true one.
+   */
+  const refreshUser = useCallback(async () => {
+    const fresh = await auth.restore().catch(() => null);
+    if (fresh) setUser(fresh);
+  }, [auth]);
+
   const reload = useCallback(async () => {
     setData(await backend.loadAll());
-  }, [backend]);
+    await refreshUser();
+  }, [backend, refreshUser]);
 
   /**
    * What a user can see depends on who they are - on Supabase, Row Level
@@ -193,15 +216,6 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     };
   }, [backend, auth, reload]);
 
-  const persistUser = useCallback(
-    async (next: UserProfile) => {
-      await auth.updateProfile(next);
-      await backend.upsertProfile(next);
-      setUser(next);
-    },
-    [auth, backend],
-  );
-
   const pushAlert = useCallback(
     async (alert: AlertItem) => {
       await backend.addAlert(alert);
@@ -252,10 +266,29 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
 
   const selectRole: AppActions['selectRole'] = useCallback(
     async (role) => {
-      if (!user) return;
-      await persistUser({ ...user, role });
+      if (!user) throw new Error('Log in first.');
+      await backend.updateOwnProfile(user.id, { role });
+      setUser({ ...user, role });
     },
-    [user, persistUser],
+    [backend, user],
+  );
+
+  const requestAccess: AppActions['requestAccess'] = useCallback(
+    async (input) => {
+      if (!user) throw new Error('Log in first.');
+      await backend.submitAccessRequest(user.id, input);
+      await reloadForUser();
+    },
+    [backend, user, reloadForUser],
+  );
+
+  const setHomeZone: AppActions['setHomeZone'] = useCallback(
+    async (zoneId) => {
+      if (!user) throw new Error('Log in first.');
+      await backend.updateOwnProfile(user.id, { homeZoneId: zoneId });
+      setUser({ ...user, homeZoneId: zoneId });
+    },
+    [backend, user],
   );
 
   const logOut: AppActions['logOut'] = useCallback(async () => {
@@ -276,6 +309,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       // reporter_id to be the caller's own id, so an anonymous report would be
       // refused by the database anyway - this just says so before trying.
       if (!user) throw new Error('Log in to report a hazard.');
+      if (user.status === 'suspended') throw new Error(SUSPENDED_MESSAGE);
 
       const report: HazardReport = {
         id: uuid(),
@@ -294,14 +328,16 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
         flagCount: 0,
         verifiedBy: null,
         verifiedAt: null,
+        rejectReason: null,
+        rejectNote: null,
         votedUserIds: [],
         flaggedUserIds: [],
       };
 
       await backend.upsertReport(report);
       setData((prev) => ({ ...prev, reports: [...prev.reports, report] }));
-
-      await persistUser({ ...user, reportsSubmitted: user.reportsSubmitted + 1 });
+      // The database counted it; show its count.
+      await refreshUser();
 
       // A hazard on a saved route is worth flagging right away, even before
       // it is verified.
@@ -323,13 +359,14 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
 
       return report;
     },
-    [backend, user, persistUser, data.routes, pushAlert],
+    [backend, user, refreshUser, data.routes, pushAlert],
   );
 
   const voteOnReport: AppActions['voteOnReport'] = useCallback(
     async (reportId, confirms) => {
       const current = data.reports.find((r) => r.id === reportId);
       if (!current || !user) return;
+      if (user.status === 'suspended') throw new Error(SUSPENDED_MESSAGE);
       const next = applyVote(current, user.id, confirms);
       if (!next) return;
       await replaceReport(next);
@@ -341,6 +378,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     async (reportId) => {
       const current = data.reports.find((r) => r.id === reportId);
       if (!current || !user) return;
+      if (user.status === 'suspended') throw new Error(SUSPENDED_MESSAGE);
       const next = applyFlag(current, user.id);
       if (!next) return;
       await replaceReport(next);
@@ -348,66 +386,29 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     [data.reports, user, replaceReport],
   );
 
+  /*
+   * Reviews. The app sends only the outcome (and, for a rejection, the
+   * reason). The database checks the report is inside this official's zone,
+   * records who reviewed it and when, alerts the reporter, updates both
+   * people's statistics and writes the audit log - the same way whether the
+   * review came from here or from Bantay Admin. Doing any of that here too
+   * would double it, or be refused: the reporter's alerts are not ours to
+   * write.
+   */
   const verifyReport: AppActions['verifyReport'] = useCallback(
     async (reportId) => {
-      // A verification is always attributed to the signed-in official who
-      // made it; there is no unnamed "Barangay Official".
       if (!user) throw new Error('Log in to verify reports.');
       const current = data.reports.find((r) => r.id === reportId);
       if (!current) return;
 
-      const next: HazardReport = {
-        ...current,
-        status: 'verified',
-        verifiedBy: `${user.name} - ${user.barangay}`,
-        verifiedAt: new Date().toISOString(),
-      };
-      await replaceReport(next);
-
-      await pushAlert({
-        id: uuid(),
-        kind: 'verified_hazard',
-        title: `Verified: ${hazardTitle(current.type)} at ${current.addressLabel}`,
-        body: 'This hazard has been confirmed by an official and is now visible to everyone nearby.',
-        createdAt: new Date().toISOString(),
-        isRead: false,
-        reportId: current.id,
-        safeSpotId: null,
-        routeId: null,
-        onSavedRoute: isOnAnySavedRoute(data.routes, current.location),
-      });
-
-      // Tell the reporter, and credit the stats on both sides.
-      if (current.reporterId === user.id) {
-        await persistUser({
-          ...user,
-          reportsVerified: user.reportsVerified + 1,
-          verificationsPerformed: user.verificationsPerformed + 1,
-        });
-      } else {
-        await persistUser({
-          ...user,
-          verificationsPerformed: user.verificationsPerformed + 1,
-        });
-        await pushAlert({
-          id: uuid(),
-          kind: 'report_verified',
-          title: 'Your report was verified',
-          body: `Your report at ${current.addressLabel} was verified and is now live on the map. Thank you for keeping the community safe.`,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-          reportId: current.id,
-          safeSpotId: null,
-          routeId: null,
-          onSavedRoute: false,
-        });
-      }
+      await replaceReport({ ...current, status: 'verified', rejectReason: null, rejectNote: null });
+      await reloadForUser();
     },
-    [data.reports, data.routes, user, replaceReport, pushAlert, persistUser],
+    [data.reports, user, replaceReport, reloadForUser],
   );
 
   const rejectReport: AppActions['rejectReport'] = useCallback(
-    async (reportId) => {
+    async (reportId, reason, note) => {
       if (!user) throw new Error('Log in to review reports.');
       const current = data.reports.find((r) => r.id === reportId);
       if (!current) return;
@@ -415,36 +416,12 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       await replaceReport({
         ...current,
         status: 'rejected',
-        verifiedBy: `${user.name} - ${user.barangay}`,
-        verifiedAt: new Date().toISOString(),
+        rejectReason: reason,
+        rejectNote: note.trim() || null,
       });
-
-      if (current.reporterId === user.id) {
-        await persistUser({
-          ...user,
-          reportsRejected: user.reportsRejected + 1,
-          verificationsPerformed: user.verificationsPerformed + 1,
-        });
-      } else {
-        await persistUser({
-          ...user,
-          verificationsPerformed: user.verificationsPerformed + 1,
-        });
-        await pushAlert({
-          id: uuid(),
-          kind: 'report_rejected',
-          title: 'Your report was not verified',
-          body: `An official reviewed your report at ${current.addressLabel} and could not confirm it. It has been removed from the map.`,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-          reportId: null,
-          safeSpotId: null,
-          routeId: null,
-          onSavedRoute: false,
-        });
-      }
+      await reloadForUser();
     },
-    [data.reports, user, replaceReport, pushAlert, persistUser],
+    [data.reports, user, replaceReport, reloadForUser],
   );
 
   // --- Routes -----------------------------------------------------------
@@ -576,6 +553,8 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       signUp,
       logIn,
       selectRole,
+      requestAccess,
+      setHomeZone,
       logOut,
       submitReport,
       voteOnReport,
@@ -594,7 +573,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       refresh: reload,
     }),
     [
-      ready, user, data, settings, signUp, logIn, selectRole, logOut,
+      ready, user, data, settings, signUp, logIn, selectRole, requestAccess, setHomeZone, logOut,
       submitReport, voteOnReport, flagReport, verifyReport, rejectReport,
       addRoute, deleteRoute, restoreRoute, markAlertRead, markAllAlertsRead,
       toggleSubscription, updateSettings, toggleLayer, setVerifiedOnly, reload,
@@ -617,7 +596,14 @@ async function loadSettings(): Promise<Settings> {
     const raw = await AsyncStorage.getItem(StoreKeys.settings);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<Settings>;
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    // Keep only settings that still exist, so switches removed in an update
+    // do not linger in storage.
+    return {
+      language: parsed.language ?? DEFAULT_SETTINGS.language,
+      alertRadiusKm: parsed.alertRadiusKm ?? DEFAULT_SETTINGS.alertRadiusKm,
+      locationGranted: parsed.locationGranted ?? DEFAULT_SETTINGS.locationGranted,
+      layers: parsed.layers ?? DEFAULT_SETTINGS.layers,
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }

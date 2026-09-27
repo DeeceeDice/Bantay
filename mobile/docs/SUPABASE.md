@@ -70,12 +70,19 @@ is empty.
 3. Open `supabase/migrations/20260923120000_bantay_initial_schema.sql` from the
    repository root, copy **all** of it, paste it in.
 4. Click **Run** (or Ctrl/Cmd + Enter).
+5. Do the same with `supabase/migrations/20260927000000_admin_console.sql`.
+   Order matters: the second builds on the first.
 
-You should see `Success. No rows returned`.
+You should see `Success. No rows returned` each time.
 
-This creates 8 tables, turns on Row Level Security for every one of them, adds
-14 access policies, creates the trigger that makes a profile row on signup,
-and enables realtime. It is safe to run more than once.
+The first creates Bantay's tables, turns on Row Level Security for every one
+of them, creates the trigger that makes a profile row on signup, and enables
+realtime. The second adds what the Bantay Admin console shares with it -
+zones, super admins, suspensions, access requests, review reasons, broadcasts
+and an audit log - and moves every rule about who may do what into the
+database. Both are safe to run more than once. See
+[docs/SHARED_DATABASE.md](../../docs/SHARED_DATABASE.md) for what the second
+one adds and why.
 
 ---
 
@@ -184,7 +191,7 @@ npm run check:supabase
 This reads the same configuration the app does (`.env`, then `app.json`)
 and reports, in order: whether the
 keys are present and are the *anon* key rather than the service key, whether
-the project answers, whether all 8 tables exist, and whether Row Level
+the project answers, whether Bantay's 8 core tables exist, and whether Row Level
 Security actually refuses an anonymous reader. It exits non-zero on failure,
 so CI can gate on it.
 
@@ -208,14 +215,31 @@ This is the thing worth showing. Realtime is already on from step 2.
 1. Install the app on **two** devices (or one phone and one simulator).
 2. Sign up as two different accounts, e.g. `commuter@test.com` and
    `official@test.com`.
-3. On the **official** account, pick **Barangay Official** at role selection.
-   (If you already chose Commuter: Profile → Change role.)
-4. On the **commuter** phone: tap the red **+**, file a hazard with a photo.
+3. On the **official** account, pick **Barangay Official** at role selection,
+   choose **Sampaloc** as the area and enter an office. That sends an access
+   request; it does not make anyone an official by itself.
+4. Approve it. A super admin does this in Bantay Admin; until the console is
+   connected, run it in the **SQL Editor** (which the database trusts):
+
+   ```sql
+   select set_config('request.jwt.claims',
+     json_build_object('sub', (select id from profiles where role = 'super_admin' limit 1))::text, true);
+   select decide_access_request(
+     (select id from access_requests where status = 'pending' order by submitted_at desc limit 1),
+     true, 'sampaloc');
+   ```
+
+   That needs one super admin to exist; see "The first super admin" in
+   [docs/SHARED_DATABASE.md](../../docs/SHARED_DATABASE.md). The official's
+   phone gets an "Access approved" alert and its Verification Panel opens.
+5. On the **commuter** phone: tap the red **+**, file a hazard in Sampaloc
+   with a photo.
    It appears as an orange pin.
-5. On the **official** phone: Profile → **Verification Panel**. The report is
+6. On the **official** phone: Profile → **Verification Panel**. The report is
    in the queue. Tap **Verify**.
-6. Watch the **commuter** phone. The pin turns red on its own, with no
-   refresh, and an alert appears in the Alerts tab.
+7. Watch the **commuter** phone. The pin turns red on its own, with no
+   refresh, and a "Your report was verified" alert arrives - sent by the
+   database, not by the official's phone.
 
 If the pin does not change, see Troubleshooting below.
 
@@ -291,8 +315,8 @@ applies it to the production database.
 > **The seed does not come with it.** Supabase runs `seed.sql` for local
 > development and preview branches only — never against production, because
 > overwriting real rows on every deploy is not a thing anyone wants by
-> accident. So a freshly connected project ends up with all 8 tables, all 14
-> policies and no data at all, which looks broken and is not.
+> accident. So a freshly connected project ends up with every table and policy
+> and no data at all, which looks broken and is not.
 >
 > Seed production once, by hand, with step 3. After that the app has spots to
 > show and the map stops looking empty.
@@ -367,10 +391,16 @@ confirmation off for a demo, or to set up the mail and redirect it needs.
 Supabase's built-in mailer only sends to members of your Supabase team, and
 only about twice an hour. Turn *Confirm email* off, or set up SMTP. See step 6.
 
-**The verify button does nothing**
-Only `barangay_official` and `school_admin` may update reports — that is the
-`reports_update_verifier` policy, and it is what stops someone verifying their
-own hazard. Check the account's `role` in **Table Editor → profiles**.
+**"Only officials can review reports, and only inside their assigned zone"**
+Exactly that: a barangay official or school admin may review a report only if
+it lies inside their zone, and a super admin anywhere. Check the account's
+`role` and `zone_id` in **Table Editor → profiles**, and that the report is in
+that zone. Roles come from an approved access request, not from the role
+screen.
+
+**"Official roles are granted by a super admin"**
+Someone tried to set their own role to an official one. That is refused by
+design - request access instead (Profile → Change role).
 
 **Realtime does not update the other phone**
 Check **Database → Publications → supabase_realtime** and confirm `reports`
@@ -382,10 +412,14 @@ is listed. Re-run the last block of the initial migration if not.
 
 | Data | Table | Who can see it |
 |---|---|---|
-| Accounts and stats | `profiles` | Anyone signed in (names show on pins) |
-| Hazard reports | `reports` | Anyone signed in; only verifiers may edit |
-| Votes / flags | `report_votes`, `report_flags` | Anyone; one per user, enforced by the primary key |
-| Safe spots | `safe_spots` | Anyone; read-only from the app |
+| Accounts and stats | `profiles` | You, plus officials and super admins. Role, status, zone and stats are set by the database or a super admin only. |
+| Hazard reports | `reports` | Anyone signed in; only officials in the report's zone, or a super admin, may review |
+| Votes / flags | `report_votes`, `report_flags` | Anyone; one per user, enforced by the primary key; not from a suspended account |
+| Safe spots | `safe_spots` | Listed ones to anyone; officials manage those in their zone |
+| Zones | `zones` | Anyone signed in |
+| Access requests | `access_requests` | Your own; super admins decide them |
+| Broadcasts | `broadcasts` | Officials and super admins; they arrive for everyone else as alerts |
+| Audit log | `audit_log` | Super admins; officials see their own entries |
 | Saved routes | `routes` | Only you |
 | Alerts | `alerts` | Only you |
 | Subscriptions | `spot_subscriptions` | Only you |

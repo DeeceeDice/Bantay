@@ -28,6 +28,9 @@ const official: UserProfile = {
   name: 'Official Cruz',
   email: 'official@example.com',
   role: 'barangay_official',
+  status: 'active',
+  zoneId: 'sampaloc',
+  homeZoneId: null,
   barangay: 'Sampaloc, Manila',
   reportsSubmitted: 0,
   reportsVerified: 0,
@@ -40,7 +43,7 @@ const official: UserProfile = {
 };
 
 describe('seed content', () => {
-  it('gives a fresh install something on every screen', () => {
+  it('covers every screen with sample data', () => {
     expect(reports.length).toBeGreaterThan(0);
     expect(spots.length).toBeGreaterThan(0);
     expect(routes.length).toBeGreaterThan(0);
@@ -199,6 +202,30 @@ describe('area-scoped moderation', () => {
     expect(
       pendingForOfficial(reports, official).every((r) => r.status === 'pending'),
     ).toBe(true);
+  });
+
+  it('a super admin sees every pending report, matching the database policy', () => {
+    const faraway = {
+      ...pendingReports(reports)[0],
+      id: 'far',
+      location: latLng(16.4023, 120.596),
+    };
+    const superAdmin = { ...official, role: 'super_admin' as const, zoneId: null };
+    expect(pendingForOfficial([...reports, faraway], superAdmin).map((r) => r.id)).toContain('far');
+  });
+});
+
+describe('escalated reports', () => {
+  it('stay on the map as awaiting review, not as verified', () => {
+    const escalated = { ...pendingReports(reports)[0], id: 'esc-1', status: 'flagged' as const };
+    const all = [...reports, escalated];
+    expect(pendingReports(all).map((r) => r.id)).toContain('esc-1');
+    expect(verifiedHazards(all).map((r) => r.id)).not.toContain('esc-1');
+  });
+
+  it('leave the official queue: they are with a super admin now', () => {
+    const escalated = { ...pendingReports(reports)[0], id: 'esc-2', status: 'flagged' as const };
+    expect(pendingForOfficial([...reports, escalated], official).map((r) => r.id)).not.toContain('esc-2');
   });
 });
 

@@ -1,5 +1,5 @@
 import { Geo, LatLng } from '../../core/geo/latLng';
-import { HazardSeverity, severityRank } from '../models/enums';
+import { HazardSeverity, isAwaitingReview, severityRank } from '../models/enums';
 import {
   AlertItem,
   HazardReport,
@@ -25,9 +25,12 @@ export const ROUTE_HAZARD_THRESHOLD_METERS = 120;
 export const verifiedHazards = (reports: readonly HazardReport[]): HazardReport[] =>
   reports.filter((r) => r.status === 'verified');
 
-/** Reports awaiting an official's decision. */
+/**
+ * Reports awaiting an official's decision - including ones an official has
+ * escalated to a super admin, which are no more confirmed than before.
+ */
 export const pendingReports = (reports: readonly HazardReport[]): HazardReport[] =>
-  reports.filter((r) => r.status === 'pending');
+  reports.filter((r) => isAwaitingReview(r.status));
 
 /** Reports filed by one user, newest first. */
 export const reportsByUser = (
@@ -135,12 +138,13 @@ export function pendingForOfficial(
   reports: readonly HazardReport[],
   official: UserProfile,
 ): HazardReport[] {
+  // Super admins review anywhere; everyone else only inside their area,
+  // which is exactly what the database's review policy allows.
+  const inScope = (r: HazardReport): boolean =>
+    official.role === 'super_admin' ||
+    Geo.distanceMeters(official.areaCenter, r.location) <= official.areaRadiusMeters;
   return reports
-    .filter(
-      (r) =>
-        r.status === 'pending' &&
-        Geo.distanceMeters(official.areaCenter, r.location) <= official.areaRadiusMeters,
-    )
+    .filter((r) => r.status === 'pending' && inScope(r))
     .sort((a, b) => {
       const bySeverity = severityRank[b.severity] - severityRank[a.severity];
       return bySeverity !== 0

@@ -1,10 +1,19 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Button, Card, EmptyState, SectionHeader, StatTile } from '../../src/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  SectionHeader,
+  StatTile,
+  StatusBanner,
+} from '../../src/components/ui';
+import { Sheet } from '../../src/components/ui/Sheet';
 import { Colors, Radius, Spacing } from '../../src/core/theme/colors';
 import { roleLabelKey } from '../../src/core/utils/hazardVisuals';
 import { canVerify } from '../../src/data/models/enums';
@@ -16,6 +25,7 @@ import { useApp } from '../../src/state/appStore';
 export default function ProfileScreen(): React.ReactElement {
   const app = useApp();
   const { s, user, data, settings } = app;
+  const [areaOpen, setAreaOpen] = useState(false);
 
   if (!user) {
     return (
@@ -26,6 +36,15 @@ export default function ProfileScreen(): React.ReactElement {
   }
 
   const myReports = reportsByUser(data.reports, user.id);
+  const homeZone = data.zones.find((z) => z.id === user.homeZoneId) ?? null;
+  const latestRequest = data.accessRequests[0] ?? null;
+
+  const chooseArea = (zoneId: string | null): void => {
+    setAreaOpen(false);
+    void app.setHomeZone(zoneId).catch((e: unknown) => {
+      Alert.alert(s('somethingWentWrong'), e instanceof Error ? e.message : String(e));
+    });
+  };
   const pendingCount = canVerify(user.role) ? pendingForOfficial(data.reports, user).length : 0;
 
   const confirmLogOut = (): void => {
@@ -61,6 +80,33 @@ export default function ProfileScreen(): React.ReactElement {
             </View>
           </View>
         </View>
+
+        {user.status === 'suspended' && (
+          <View style={styles.banner}>
+            <StatusBanner
+              icon="block"
+              title={s('accountSuspendedTitle')}
+              message={s('accountSuspendedBody')}
+              color={Colors.brandRed}
+            />
+          </View>
+        )}
+        {latestRequest && latestRequest.status !== 'approved' && (
+          <View style={styles.banner}>
+            <StatusBanner
+              icon={latestRequest.status === 'pending' ? 'hourglass-top' : 'block'}
+              title={latestRequest.status === 'pending' ? s('requestPending') : s('requestDenied')}
+              message={
+                latestRequest.status === 'pending'
+                  ? `${s(roleLabelKey(latestRequest.role))} - ${
+                      data.zones.find((z) => z.id === latestRequest.zoneId)?.name ?? ''
+                    }`
+                  : latestRequest.decisionNote ?? undefined
+              }
+              color={latestRequest.status === 'pending' ? Colors.warning : Colors.inkMuted}
+            />
+          </View>
+        )}
 
         <View style={styles.stats}>
           <StatTile
@@ -113,20 +159,12 @@ export default function ProfileScreen(): React.ReactElement {
 
         <SectionHeader title={s('notificationPreferences')} />
         <Card padded={false}>
-          <ToggleRow
-            icon="notifications-active"
-            label={s('pushAlerts')}
-            description={s('pushAlertsDesc')}
-            value={settings.pushEnabled}
-            onValueChange={(v) => void app.updateSettings({ pushEnabled: v })}
-          />
-          <Divider />
-          <ToggleRow
-            icon="sms"
-            label={s('smsFallback')}
-            description={s('smsFallbackDesc')}
-            value={settings.smsFallbackEnabled}
-            onValueChange={(v) => void app.updateSettings({ smsFallbackEnabled: v })}
+          <Row
+            icon="place"
+            label={s('myArea')}
+            description={s('myAreaDesc')}
+            trailing={homeZone?.name ?? s('noAreaChosen')}
+            onPress={() => setAreaOpen(true)}
           />
           <Divider />
           <View style={styles.radiusRow}>
@@ -210,6 +248,34 @@ export default function ProfileScreen(): React.ReactElement {
         />
         <Text style={styles.version}>Bantay 1.0.0</Text>
       </ScrollView>
+
+      <Sheet visible={areaOpen} onClose={() => setAreaOpen(false)}>
+        <Text style={styles.sheetTitle}>{s('myArea')}</Text>
+        <Text style={styles.sheetSub}>{s('myAreaDesc')}</Text>
+        {[null, ...data.zones.map((z) => z.id)].map((id) => {
+          const zone = data.zones.find((z) => z.id === id) ?? null;
+          const on = (user.homeZoneId ?? null) === id;
+          return (
+            <Pressable
+              key={id ?? 'none'}
+              onPress={() => chooseArea(id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
+              style={styles.areaRow}
+            >
+              <MaterialIcons
+                name={on ? 'radio-button-checked' : 'radio-button-unchecked'}
+                size={22}
+                color={on ? Colors.brandBlue : Colors.inkFaint}
+              />
+              <View style={styles.areaBody}>
+                <Text style={styles.areaName}>{zone ? zone.name : s('clearArea')}</Text>
+                {zone && <Text style={styles.areaCity}>{zone.city}</Text>}
+              </View>
+            </Pressable>
+          );
+        })}
+      </Sheet>
     </SafeAreaView>
   );
 }
@@ -217,12 +283,14 @@ export default function ProfileScreen(): React.ReactElement {
 function Row({
   icon,
   label,
+  description,
   trailing,
   onPress,
   highlight = false,
 }: {
   icon: React.ComponentProps<typeof MaterialIcons>['name'];
   label: string;
+  description?: string;
   trailing?: string;
   onPress: () => void;
   highlight?: boolean;
@@ -234,45 +302,18 @@ function Row({
         size={20}
         color={highlight ? Colors.safe : Colors.inkMuted}
       />
-      <Text
-        style={[styles.rowLabel, { color: highlight ? Colors.safeDark : Colors.ink }]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
+      <View style={styles.rowBody}>
+        <Text
+          style={[styles.rowLabel, { color: highlight ? Colors.safeDark : Colors.ink }]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        {description && <Text style={styles.rowDesc}>{description}</Text>}
+      </View>
       {trailing && <Text style={styles.rowTrailing}>{trailing}</Text>}
       <MaterialIcons name="chevron-right" size={20} color={Colors.inkFaint} />
     </Pressable>
-  );
-}
-
-function ToggleRow({
-  icon,
-  label,
-  description,
-  value,
-  onValueChange,
-}: {
-  icon: React.ComponentProps<typeof MaterialIcons>['name'];
-  label: string;
-  description: string;
-  value: boolean;
-  onValueChange: (next: boolean) => void;
-}): React.ReactElement {
-  return (
-    <View style={styles.row}>
-      <MaterialIcons name={icon} size={20} color={Colors.inkMuted} />
-      <View style={styles.toggleBody}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        <Text style={styles.rowDesc}>{description}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ true: Colors.safe, false: Colors.line }}
-        accessibilityLabel={label}
-      />
-    </View>
   );
 }
 
@@ -302,10 +343,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg,
   },
-  rowLabel: { flex: 1, fontSize: 16, fontWeight: '600', color: Colors.ink, marginLeft: Spacing.md },
+  rowBody: { flex: 1 },
+  rowLabel: { fontSize: 16, fontWeight: '600', color: Colors.ink, marginLeft: Spacing.md },
   rowTrailing: { fontSize: 13, color: Colors.inkMuted, marginRight: 6 },
   rowDesc: { fontSize: 12.5, color: Colors.inkMuted, marginTop: 2, marginLeft: Spacing.md },
-  toggleBody: { flex: 1 },
+  banner: { marginBottom: Spacing.md },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: Colors.ink },
+  sheetSub: { fontSize: 13.5, color: Colors.inkMuted, marginTop: Spacing.xs, marginBottom: Spacing.md },
+  areaRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
+  areaBody: { marginLeft: Spacing.md },
+  areaName: { fontSize: 15, fontWeight: '600', color: Colors.ink },
+  areaCity: { fontSize: 12, color: Colors.inkMuted },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.line },
   radiusRow: { padding: Spacing.lg },
   radiusHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
