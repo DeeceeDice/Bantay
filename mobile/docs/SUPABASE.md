@@ -264,24 +264,26 @@ door. Email and password are the only way in. To add Google for real:
 
 ---
 
-## Step 9 — Optional: real photos
+## Step 9 — Optional: move photos to Storage
 
-Right now a report's `photo_uri` is a local file path on the device that took
-it, so it does not display on a second phone. To fix that you need Storage:
+A report's photo already reaches every device: the app downscales it to an
+800px JPEG (about 100 KB) and stores it in `photo_uri` as a data URI
+(`src/core/utils/reportPhoto.ts`), so officials see it in Bantay Admin and on
+their own phones with no extra setup. Reports filed before this held a path on
+the reporter's phone; those show "Photo unavailable" everywhere else.
+
+That keeps the project card-free, at the cost of every report row carrying
+its photo. If reports grow into the thousands, move photos to Storage:
 
 1. Dashboard → **Storage → New bucket**, name it `hazard-photos`, mark it
    **Public**.
-2. Upload the file after picking it, and store the returned public URL in
-   `photo_uri` instead of the local path.
+2. Upload the compressed file after picking it, and store the returned public
+   URL in `photo_uri` instead of the data URI. Both apps already display
+   `https://` photos.
 
 **Heads up on cost:** since 3 February 2026 Cloud Storage requires a linked
 billing account (the Blaze-equivalent plan) even at zero usage. Your bill
 stays ₱0 inside the free allowance, but you need a card on file.
-
-**To stay completely card-free for a demo,** skip Storage: downscale the image
-and store it as a base64 string in the `photo_uri` column. A ~600px JPEG fits
-comfortably under Postgres row limits and nobody watching a demo can tell the
-difference.
 
 ---
 

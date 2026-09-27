@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { HazardType } from '../../data/models/enums';
@@ -15,6 +15,10 @@ const SEED_PREFIX = 'seed:';
  * sample scenes (`seed:` prefix), and no photo at all. Sample scenes are
  * drawn rather than shipped as fake JPEGs, so the app never passes off an
  * illustration as a real photograph of a real place.
+ *
+ * A photo that will not load - an older report whose photo is a path on the
+ * reporter's own phone - falls back to the illustration instead of an empty
+ * box.
  */
 export function HazardPhoto({
   uri,
@@ -27,7 +31,9 @@ export function HazardPhoto({
   height?: number;
   radius?: number;
 }): React.ReactElement {
-  const isSample = !uri || uri.startsWith(SEED_PREFIX);
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const failed = uri !== null && uri === failedUri;
+  const isSample = !uri || uri.startsWith(SEED_PREFIX) || failed;
 
   if (isSample) {
     return (
@@ -38,7 +44,9 @@ export function HazardPhoto({
         ]}
       >
         <MaterialIcons name={hazardIcon(type)} size={36} color={Colors.brandBlue} />
-        <Text style={styles.sampleLabel}>{uri ? 'Sample photo' : 'No photo'}</Text>
+        <Text style={styles.sampleLabel}>
+          {failed ? 'Photo unavailable' : uri ? 'Sample photo' : 'No photo'}
+        </Text>
       </View>
     );
   }
@@ -49,6 +57,7 @@ export function HazardPhoto({
       style={[styles.photo, { height, borderRadius: radius }]}
       resizeMode="cover"
       accessibilityLabel="Hazard photo"
+      onError={() => setFailedUri(uri)}
     />
   );
 }

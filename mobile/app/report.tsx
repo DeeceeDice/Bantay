@@ -20,6 +20,7 @@ import {
   severityIcon,
   severityLabelKey,
 } from '../src/core/utils/hazardVisuals';
+import { compressReportPhoto } from '../src/core/utils/reportPhoto';
 import {
   HAZARD_SEVERITIES,
   HAZARD_TYPES,
@@ -98,7 +99,8 @@ export default function ReportScreen(): React.ReactElement {
             });
 
       if (!result.canceled && result.assets.length > 0) {
-        setPhotoUri(result.assets[0].uri);
+        // Stored in the report itself so officials on other devices see it.
+        setPhotoUri(await compressReportPhoto(result.assets[0].uri));
       }
     } catch (error) {
       Alert.alert(s('somethingWentWrong'), String(error));
