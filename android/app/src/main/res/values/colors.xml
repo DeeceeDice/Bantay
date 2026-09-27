@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Bantay brand blue, from the eye shape in the logo. -->
-    <color name="ic_launcher_background">#1B4FA0</color>
-    <color name="bantay_blue">#1B4FA0</color>
-    <color name="bantay_red">#C8102E</color>
-</resources>

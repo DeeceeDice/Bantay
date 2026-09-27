@@ -8,9 +8,6 @@
 # Generation) and never committed. The APK is signed with the Expo template's
 # fixed debug keystore and stamped with the run number as its version code
 # (mobile/app.config.js), so each build installs over the previous one.
-#
-# The Flutter build at the repository root keeps accounts on the phone and
-# does not connect to Bantay Admin; it is not published here.
 
 name: Android APK
 

@@ -29,8 +29,8 @@ supabase/
 ```
 
 It sits at the repository root rather than inside `mobile/`, because the
-database is shared infrastructure: the Flutter build, the Expo build and the
-dashboard all talk to the same Postgres.
+database is shared infrastructure: this app, Bantay Admin and the dashboard
+all talk to the same Postgres.
 
 There are two ways to get that SQL into a project, and they are not
 alternatives so much as stages:
@@ -212,7 +212,7 @@ than one that is simply down.
 
 This is the thing worth showing. Realtime is already on from step 2.
 
-1. Install the app on **two** devices (or one phone and one simulator).
+1. Install the app on **two** devices (or one phone and one emulator).
 2. Sign up as two different accounts, e.g. `commuter@test.com` and
    `official@test.com`.
 3. On the **official** account, pick **Barangay Official** at role selection,
