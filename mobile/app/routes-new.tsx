@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { BantayMap, MapMarker, MapPolyline } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
@@ -9,7 +9,6 @@ import { Field } from '../src/components/ui/AuthScaffold';
 import { PlacementPin } from '../src/components/ui/Pins';
 import { LatLng } from '../src/core/geo/latLng';
 import { Colors, Spacing } from '../src/core/theme/colors';
-import { Alert } from '../src/core/utils/alert';
 import { describePoint } from '../src/data/seed/gazetteer';
 import { useApp } from '../src/state/appStore';
 import { useUserLocation } from '../src/state/LocationProvider';

@@ -1,10 +1,10 @@
-# Bantay — React Native (Expo)
+# Bantay — Android app (React Native / Expo)
 
 Real-time community hazard mapping for the Philippines.
 
-This is the React Native build. A Flutter build of the same app lives in the
-repository root; the two are independent — keep whichever you prefer and
-delete the other.
+The installable APK is built from this folder and published on the
+repository's Releases page on every push to `main`
+(see [docs/RELEASING.md](../docs/RELEASING.md)).
 
 ---
 
@@ -16,8 +16,8 @@ npm install
 npx expo start
 ```
 
-Scan the QR code with **Expo Go** on your phone, or press `a` for an Android
-emulator, `i` for an iOS simulator, `w` for the browser.
+Scan the QR code with **Expo Go** on your Android phone, or press `a` for an
+Android emulator.
 
 **Accounts are real.** Signing up creates an account in the project's
 Supabase database and signing in checks it there - there is no on-device
@@ -84,9 +84,9 @@ Mercator projection, a gesture-driven camera, a raster tile layer and SVG
 vector overlays.
 
 Building it rather than embedding a vendor SDK buys three things: the app
-needs **no API key** to run, there is no per-map-view billing, and behaviour
-is identical on Android, iOS and web. The cost is no vector tiles, no 3D and
-no built-in routing — none of which this app needs.
+needs **no API key** to run, there is no per-map-view billing, and nothing
+depends on Google Play Services. The cost is no vector tiles, no 3D and no
+built-in routing — none of which this app needs.
 
 **Before you distribute the app**, change the tile source. The default points
 at OpenStreetMap's volunteer-run servers, and

@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Badge, Button, Card, EmptyState } from '../src/components/ui';
 import { Field } from '../src/components/ui/AuthScaffold';
@@ -8,7 +8,6 @@ import { Sheet } from '../src/components/ui/Sheet';
 import { HazardPhoto } from '../src/components/ui/HazardPhoto';
 import { Geo } from '../src/core/geo/latLng';
 import { Colors, Spacing } from '../src/core/theme/colors';
-import { Alert } from '../src/core/utils/alert';
 import {
   hazardLabelKey,
   rejectReasonLabelKey,
