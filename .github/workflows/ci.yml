@@ -1,8 +1,8 @@
 name: CI
 
 # Fast feedback on every push: static analysis, the full test suite, and a
-# debug APK you can install on a phone straight from the run's artifacts -
-# no tag, no signing keys, no local toolchain required.
+# debug APK of the Flutter offline build straight from the run's artifacts.
+# The connected Android app is built and published by android-apk.yml.
 on:
   push:
     branches: ['**']
@@ -69,10 +69,12 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
+      # The Flutter build keeps accounts on the phone and does not connect to
+      # Bantay Admin; the downloadable app is mobile/ (android-apk.yml).
       - name: Upload debug APK
         uses: actions/upload-artifact@v6
         with:
-          name: bantay-debug-apk
+          name: bantay-flutter-offline-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 30
 

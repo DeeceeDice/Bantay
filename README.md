@@ -13,20 +13,18 @@ it; everyone nearby sees it on a live map.
 
 **Android — download and install**
 
-1. Open the [Releases page](../../releases) of this repository.
-2. Download `bantay-<version>-universal.apk`.
-3. Open the file on your phone and allow installation from unknown sources
-   when prompted.
+1. On your Android phone, open the [latest release](../../releases/latest) of
+   this repository.
+2. Tap `bantay-<version>-build<N>.apk`, then open the download and allow
+   installing from your browser when asked. Later builds install over it.
+3. Sign up in the app. The same email and password sign in to
+   [Bantay Admin](https://github.com/DeeceeDice/Bantay_Admin), the officials'
+   console, which shares the same database.
 
-`arm64-v8a` is a smaller download and works on virtually every phone sold
-since 2017, if you'd rather not take the universal build.
+A new APK is published automatically on every push to `main` that changes
+the app (see [docs/RELEASING.md](docs/RELEASING.md)).
 
-**Every push also produces an installable build.** Open the
-[Actions tab](../../actions), pick the latest *CI* run and download the
-`bantay-debug-apk` artifact — no release tag needed.
-
-**Web** — the same app runs in a browser. Download `bantay-<version>-web.zip`
-from a release and serve it from any static host, or run `flutter run -d chrome`.
+**Web** — the same app runs in a browser: `cd mobile && npm install && npx expo start --web`.
 
 **iOS** — the project is configured and builds, but Apple requires a paid
 Developer Program membership and a Mac to produce an installable `.ipa`. See
@@ -87,21 +85,28 @@ Geoapify, Thunderforest) or self-host - a one-line change in
 [`map_tile_source.dart`](lib/core/map/map_tile_source.dart), and nothing else
 in the app moves.
 
-**The backend is local, by design.** Accounts, reports, verification, alerts
-and subscriptions all run against on-device storage, so every feature is real
-and fully exercisable the moment you install the app — nothing is a dead
-button. What this does *not* yet do is sync between devices: two phones running
-Bantay today each have their own world. Making it multi-user means
+**One database, shared with Bantay Admin.** The app you download is the
+React Native build in [`mobile/`](mobile/). Accounts, reports, verification,
+alerts and subscriptions live in one Supabase project, so every phone sees the
+same map and officials review reports in Bantay Admin. See
+[mobile/README.md](mobile/README.md) and
+[docs/SHARED_DATABASE.md](docs/SHARED_DATABASE.md).
+
+The Flutter build at the repository root is an **offline build**: it keeps
+everything on the device, so two phones running it each have their own world
+and its accounts do not exist in Bantay Admin. Making it multi-user means
 reimplementing two files ([`auth_repository.dart`](lib/data/repositories/auth_repository.dart)
 and [`bantay_repository.dart`](lib/data/repositories/bantay_repository.dart))
-against a real backend; no screen touches storage directly, so the UI does not
-change. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#going-multi-user).
+against the shared database; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#going-multi-user).
 
 ---
 
 ## Building from source
 
-Requires the [Flutter SDK](https://docs.flutter.dev/get-started/install)
+The app (React Native, `mobile/`): see [mobile/README.md](mobile/README.md) -
+`cd mobile && npm install && npx expo start`.
+
+The Flutter offline build requires the [Flutter SDK](https://docs.flutter.dev/get-started/install)
 3.47.5 or newer.
 
 ```bash

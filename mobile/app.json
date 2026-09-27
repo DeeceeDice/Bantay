@@ -28,7 +28,6 @@
         "backgroundColor": "#1B4FA0"
       },
       "package": "com.deeceedice.bantay",
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",

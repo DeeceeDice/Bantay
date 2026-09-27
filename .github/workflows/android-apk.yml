@@ -1,0 +1,104 @@
+# Builds the downloadable Android app: the React Native (Expo) build in
+# mobile/, which signs in to the shared Bantay database - the same accounts,
+# reports and alerts as Bantay Admin. Every push to main that touches mobile/
+# publishes it as the latest GitHub Release, so the phone download is always
+# the current app.
+#
+# mobile/android/ is generated here by `expo prebuild` (Continuous Native
+# Generation) and never committed. The APK is signed with the Expo template's
+# fixed debug keystore and stamped with the run number as its version code
+# (mobile/app.config.js), so each build installs over the previous one.
+#
+# The Flutter build at the repository root keeps accounts on the phone and
+# does not connect to Bantay Admin; it is not published here.
+
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '!mobile/**/*.md'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build and publish the Bantay APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck, lint and test
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test -- --ci
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build the release APK
+        working-directory: mobile/android
+        # Real phones are ARM; skipping the emulator ABIs halves the build.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+
+      - name: Name the APK
+        id: apk
+        run: |
+          version=$(node -p "require('./app.json').expo.version")
+          name="bantay-${version}-build${{ github.run_number }}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          ls -lh "$name"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: mobile/${{ steps.apk.outputs.name }}
+          if-no-files-found: error
+
+      - name: Publish a release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="android-v${{ steps.apk.outputs.version }}-build${{ github.run_number }}"
+          gh release create "$tag" "${{ steps.apk.outputs.name }}" \
+            --target "${{ github.sha }}" \
+            --title "Bantay ${{ steps.apk.outputs.version }} (build ${{ github.run_number }})" \
+            --latest \
+            --notes "Community hazard map for the Philippines. Sign up in the app; the same email and password work in Bantay Admin.
+
+          **Install:** open this page on your Android phone, tap **${{ steps.apk.outputs.name }}**, then open the download and allow installing from your browser if asked. Later builds install over this one.
+
+          Built from ${{ github.sha }}."

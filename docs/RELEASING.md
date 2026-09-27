@@ -1,37 +1,38 @@
 # Releasing Bantay
 
-Everything here happens on GitHub. You do not need Flutter, Android Studio or
-a Mac installed to produce a downloadable Android app.
+Everything here happens on GitHub. You do not need Node, Flutter, Android
+Studio or a Mac installed to produce a downloadable Android app.
 
 ---
 
-## 1. The fastest path: an installable APK, right now
+## 1. The Android app: published on every push
 
-1. Open the **Actions** tab of this repository.
-2. Click the most recent **CI** run.
-3. Scroll to **Artifacts** and download `bantay-debug-apk`.
-4. Unzip it and send `app-debug.apk` to an Android phone.
-5. On the phone, open the file and allow installation from unknown sources.
+The app people download is the React Native build in `mobile/`. It signs in
+to the shared Bantay database, so the same account works in Bantay Admin and
+every report, verification and alert is shared.
 
-This runs on every push. It is a debug build — larger and slower than a release
-build, and not publishable — but it installs and runs exactly like the real
-thing, which makes it the right way to get the app into testers' hands today.
+Every push to `main` that touches `mobile/` runs the **Android APK** workflow
+(`.github/workflows/android-apk.yml`). It typechecks, lints and tests the app,
+builds a release APK and publishes it as the latest GitHub Release:
+
+1. Open the **Releases** page of this repository on an Android phone.
+2. Tap `bantay-<version>-build<N>.apk` in the latest release.
+3. Open the download and allow installing from your browser if asked.
+
+Each build is signed with the same key and numbered by its run, so a newer
+build installs over an older one and keeps the user signed in. To build
+without pushing, run **Android APK** from the Actions tab.
 
 ---
 
-## 2. A public release
+## 2. The Flutter offline build
 
-Tag a version and the Release workflow publishes it:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-Or run the **Release** workflow manually from the Actions tab and type a
-version number.
-
-Either way you get a GitHub Release carrying:
+The Flutter build at the repository root keeps accounts, reports and alerts on
+the phone. It does not connect to the shared database, so its accounts cannot
+sign in to Bantay Admin. Every CI run still builds it (`bantay-flutter-offline-debug-apk`
+under the run's **Artifacts**), and the **Release (Flutter offline build)**
+workflow, run by hand from the Actions tab, publishes it as a pre-release
+tagged `flutter-v<version>`, never as the latest release:
 
 | Artifact | What it is for |
 |---|---|
@@ -42,8 +43,7 @@ Either way you get a GitHub Release carrying:
 | `bantay-<version>.aab` | Uploading to the Google Play Console |
 | `bantay-<version>-web.zip` | Serving from any static host |
 
-Anyone can then download the APK from the Releases page — no GitHub account
-needed.
+The signing and shrinking notes below apply to this Flutter build.
 
 ---
 
@@ -160,5 +160,7 @@ it, check directions. If anything misbehaves, the keep rules need widening.
 
 `pubspec.yaml` holds `version: 1.0.0+1`. The release workflow overrides the
 build number with the workflow run number so every published artifact is
-uniquely versioned. Bump the `1.0.0` part by hand when you cut a new version,
-and tag it to match.
+uniquely versioned. Bump the `1.0.0` part by hand when you cut a new version.
+
+The Android app's version is `expo.version` in `mobile/app.json`; its build
+number is the Android APK workflow's run number (`mobile/app.config.js`).
