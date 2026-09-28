@@ -1,8 +1,13 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Button, Card, EmptyState } from '../src/components/ui';
+import { BantayMap } from '../src/components/map/BantayMap';
+import { useMapController } from '../src/components/map/useMapController';
+import { AppBar, Badge, Button, Card, EmptyState, SegmentedButton } from '../src/components/ui';
+import { HazardPin } from '../src/components/ui/Pins';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { Sheet } from '../src/components/ui/Sheet';
 import { HazardPhoto } from '../src/components/ui/HazardPhoto';
@@ -17,8 +22,10 @@ import {
 } from '../src/core/utils/hazardVisuals';
 import { timeAgoCompact } from '../src/core/utils/timeAgo';
 import { REJECT_REASONS, RejectReason, canVerify } from '../src/data/models/enums';
+import { HazardReport } from '../src/data/models/types';
 import { pendingForOfficial } from '../src/data/repositories/logic';
 import { useApp } from '../src/state/appStore';
+import { useUserLocation } from '../src/state/LocationProvider';
 
 /**
  * Where barangay officials and school admins act on community reports.
@@ -35,19 +42,36 @@ export default function VerificationScreen(): React.ReactElement {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState<RejectReason | null>(null);
   const [note, setNote] = useState('');
+  const [mapView, setMapView] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const location = useUserLocation();
+  const controller = useMapController({ center: location.current, zoom: 15 });
+
+  const header = (right?: React.ReactNode): React.ReactElement => (
+    <AppBar
+      title={s('verificationPanel')}
+      leading="back"
+      onLeading={() => router.back()}
+      right={right}
+    />
+  );
 
   if (!user || !canVerify(user.role)) {
     return (
-      <View style={styles.container}>
-        <EmptyState
-          icon="lock"
-          message="This panel is only available to barangay officials and school admins."
-        />
-      </View>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        {header()}
+        <View style={styles.container}>
+          <EmptyState
+            icon="lock"
+            message="This panel is only available to barangay officials and school admins."
+          />
+        </View>
+      </SafeAreaView>
     );
   }
 
   const pending = pendingForOfficial(data.reports, user);
+  const selected = pending.find((r) => r.id === selectedId) ?? null;
 
   const confirmReject = (reportId: string): void => {
     setRejectingId(reportId);
@@ -72,150 +96,202 @@ export default function VerificationScreen(): React.ReactElement {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.areaHeader}>
-        <MaterialIcons name="shield" size={20} color={Colors.brandBlueDark} />
-        <View style={styles.areaBody}>
-          <Text style={styles.areaTitle}>{s('pendingInYourArea')}</Text>
-          <Text style={styles.areaSub}>
-            {user.barangay} - {Geo.formatDistance(user.areaRadiusMeters)} radius
-          </Text>
+  /** One pending report with its evidence and the verify / reject actions. */
+  const renderCard = (report: HazardReport): React.ReactElement => (
+    <Card key={report.id} padded={false} style={styles.card}>
+      <View style={styles.cardTop}>
+        <View style={styles.photo}>
+          <HazardPhoto uri={report.photoUri} type={report.type} height={74} radius={10} />
         </View>
-        <Badge label={String(pending.length)} color={Colors.brandBlueDark} filled />
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle}>{s(hazardLabelKey(report.type))}</Text>
+          <Text style={styles.cardSub} numberOfLines={2}>
+            {report.addressLabel}
+          </Text>
+          <View style={styles.badges}>
+            <Badge
+              label={s(severityLabelKey(report.severity))}
+              color={severityColor(report.severity)}
+              icon={severityIcon(report.severity)}
+              compact
+            />
+            <Badge
+              label={timeAgoCompact(report.reportedAt)}
+              color={Colors.inkMuted}
+              icon="schedule"
+              compact
+            />
+            {report.confirmCount > 0 && (
+              <Badge
+                label={String(report.confirmCount)}
+                color={Colors.safe}
+                icon="how-to-vote"
+                compact
+              />
+            )}
+            {report.flagCount > 0 && (
+              <Badge
+                label={String(report.flagCount)}
+                color={Colors.brandRed}
+                icon="flag"
+                compact
+              />
+            )}
+          </View>
+        </View>
       </View>
 
-      {pending.length === 0 ? (
-        <EmptyState icon="verified" title={s('allCaughtUp')} message={s('nothingToVerify')} />
-      ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          {pending.map((report) => (
-            <Card key={report.id} padded={false} style={styles.card}>
-              <View style={styles.cardTop}>
-                <View style={styles.photo}>
-                  <HazardPhoto uri={report.photoUri} type={report.type} height={74} radius={10} />
-                </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>{s(hazardLabelKey(report.type))}</Text>
-                  <Text style={styles.cardSub} numberOfLines={2}>
-                    {report.addressLabel}
-                  </Text>
-                  <View style={styles.badges}>
-                    <Badge
-                      label={s(severityLabelKey(report.severity))}
-                      color={severityColor(report.severity)}
-                      icon={severityIcon(report.severity)}
-                      compact
-                    />
-                    <Badge
-                      label={timeAgoCompact(report.reportedAt)}
-                      color={Colors.inkMuted}
-                      icon="schedule"
-                      compact
-                    />
-                    {report.confirmCount > 0 && (
-                      <Badge
-                        label={String(report.confirmCount)}
-                        color={Colors.safe}
-                        icon="how-to-vote"
-                        compact
-                      />
-                    )}
-                    {report.flagCount > 0 && (
-                      <Badge
-                        label={String(report.flagCount)}
-                        color={Colors.brandRed}
-                        icon="flag"
-                        compact
-                      />
-                    )}
-                  </View>
-                </View>
-              </View>
-
-              {report.description.length > 0 && (
-                <Text style={styles.quote}>&quot;{report.description}&quot;</Text>
-              )}
-              <Text style={styles.reporter}>
-                {s('reportedBy')} {report.reporterName}
-              </Text>
-
-              <View style={styles.actions}>
-                <Button
-                  label={s('reject')}
-                  variant="outline"
-                  icon="close"
-                  color={Colors.inkMuted}
-                  style={styles.rejectButton}
-                  disabled={busyId === report.id}
-                  onPress={() => confirmReject(report.id)}
-                />
-                <Button
-                  label={s('verify')}
-                  icon="verified"
-                  color={Colors.safe}
-                  style={styles.verifyButton}
-                  loading={busyId === report.id}
-                  onPress={() => {
-                    setBusyId(report.id);
-                    void verifyReport(report.id).then(
-                      () => {
-                        setBusyId(null);
-                        Alert.alert(s('reportVerifiedToast'));
-                      },
-                      (error: unknown) => {
-                        // RLS refuses anyone who is not an official, and the
-                        // backend turns that silent refusal into an error.
-                        setBusyId(null);
-                        Alert.alert(
-                          s('somethingWentWrong'),
-                          error instanceof Error ? error.message : String(error),
-                        );
-                      },
-                    );
-                  }}
-                />
-              </View>
-            </Card>
-          ))}
-        </ScrollView>
+      {report.description.length > 0 && (
+        <Text style={styles.quote}>&quot;{report.description}&quot;</Text>
       )}
-      <Sheet visible={rejectingId !== null} onClose={() => setRejectingId(null)}>
-        <Text style={styles.sheetTitle}>{s('rejectReasonTitle')}</Text>
-        {REJECT_REASONS.map((r) => {
-          const on = reason === r;
-          return (
-            <Pressable
-              key={r}
-              onPress={() => setReason(r)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: on }}
-              style={styles.reasonRow}
-            >
-              <MaterialIcons
-                name={on ? 'radio-button-checked' : 'radio-button-unchecked'}
-                size={22}
-                color={on ? Colors.brandRed : Colors.inkFaint}
-              />
-              <Text style={styles.reasonText}>{s(rejectReasonLabelKey(r))}</Text>
-            </Pressable>
-          );
-        })}
-        <View style={styles.noteWrap}>
-          <Field label={s('rejectNote')} value={note} onChangeText={setNote} maxLength={300} multiline />
-        </View>
+      <Text style={styles.reporter}>
+        {s('reportedBy')} {report.reporterName}
+      </Text>
+
+      <View style={styles.actions}>
         <Button
           label={s('reject')}
-          color={Colors.brandRed}
-          disabled={!reason}
-          onPress={submitReject}
+          variant="outline"
+          icon="close"
+          color={Colors.inkMuted}
+          style={styles.rejectButton}
+          disabled={busyId === report.id}
+          onPress={() => confirmReject(report.id)}
         />
-      </Sheet>
-    </View>
+        <Button
+          label={s('verify')}
+          icon="verified"
+          color={Colors.safe}
+          style={styles.verifyButton}
+          loading={busyId === report.id}
+          onPress={() => {
+            setBusyId(report.id);
+            void verifyReport(report.id).then(
+              () => {
+                setBusyId(null);
+                Alert.alert(s('reportVerifiedToast'));
+              },
+              (error: unknown) => {
+                // RLS refuses anyone who is not an official, and the
+                // backend turns that silent refusal into an error.
+                setBusyId(null);
+                Alert.alert(
+                  s('somethingWentWrong'),
+                  error instanceof Error ? error.message : String(error),
+                );
+              },
+            );
+          }}
+        />
+      </View>
+    </Card>
+  );
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      {header(
+        <SegmentedButton
+          compact
+          segments={[
+            {
+              value: false,
+              icon: <MaterialIcons name="list" size={18} color={Colors.ink} />,
+              accessibilityLabel: s('listView'),
+            },
+            {
+              value: true,
+              icon: <MaterialCommunityIcons name="map-outline" size={18} color={Colors.ink} />,
+              accessibilityLabel: s('mapView'),
+            },
+          ]}
+          value={mapView}
+          onChange={setMapView}
+        />,
+      )}
+      <View style={styles.container}>
+        <View style={styles.areaHeader}>
+          <MaterialCommunityIcons name="shield-outline" size={20} color={Colors.brandBlueDark} />
+          <View style={styles.areaBody}>
+            <Text style={styles.areaTitle}>{s('pendingInYourArea')}</Text>
+            <Text style={styles.areaSub}>
+              {user.barangay} - {Geo.formatDistance(user.areaRadiusMeters)} radius
+            </Text>
+          </View>
+          <Badge label={String(pending.length)} color={Colors.brandBlueDark} filled />
+        </View>
+
+        {pending.length === 0 ? (
+          <EmptyState icon="verified" title={s('allCaughtUp')} message={s('nothingToVerify')} />
+        ) : mapView ? (
+          <View style={styles.mapWrap}>
+            <BantayMap
+              controller={controller}
+              onPress={() => setSelectedId(null)}
+              markers={pending.map((report) => ({
+                id: report.id,
+                point: report.location,
+                width: 44,
+                height: 53,
+                onPress: () => {
+                  setSelectedId(report.id);
+                  controller.moveTo(report.location);
+                },
+                render: () => (
+                  <HazardPin
+                    type={report.type}
+                    status={report.status}
+                    selected={selectedId === report.id}
+                  />
+                ),
+              }))}
+            />
+            {selected && <View style={styles.mapCard}>{renderCard(selected)}</View>}
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.list}>
+            {pending.map((report) => renderCard(report))}
+          </ScrollView>
+        )}
+        <Sheet visible={rejectingId !== null} onClose={() => setRejectingId(null)}>
+          <Text style={styles.sheetTitle}>{s('rejectReasonTitle')}</Text>
+          {REJECT_REASONS.map((r) => {
+            const on = reason === r;
+            return (
+              <Pressable
+                key={r}
+                onPress={() => setReason(r)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                style={styles.reasonRow}
+              >
+                <MaterialIcons
+                  name={on ? 'radio-button-checked' : 'radio-button-unchecked'}
+                  size={22}
+                  color={on ? Colors.brandRed : Colors.inkFaint}
+                />
+                <Text style={styles.reasonText}>{s(rejectReasonLabelKey(r))}</Text>
+              </Pressable>
+            );
+          })}
+          <View style={styles.noteWrap}>
+            <Field label={s('rejectNote')} value={note} onChangeText={setNote} maxLength={300} multiline />
+          </View>
+          <Button
+            label={s('reject')}
+            color={Colors.brandRed}
+            disabled={!reason}
+            onPress={submitReject}
+          />
+        </Sheet>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Colors.surface },
+  mapWrap: { flex: 1 },
+  mapCard: { position: 'absolute', left: Spacing.md, right: Spacing.md, bottom: Spacing.md },
   sheetTitle: { fontSize: 18, fontWeight: '800', color: Colors.ink, marginBottom: Spacing.md },
   reasonRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm },
   reasonText: { fontSize: 15, color: Colors.ink, marginLeft: Spacing.md },

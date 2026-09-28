@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { BantayMap, MapMarker, MapPolyline } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
@@ -113,6 +113,7 @@ export default function DirectionsScreen(): React.ReactElement {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen options={{ title: navigating ? s('navigatingTo') : s('routePreview') }} />
       <BantayMap controller={controller} markers={markers} polylines={polylines} />
 
       <View style={styles.panel}>

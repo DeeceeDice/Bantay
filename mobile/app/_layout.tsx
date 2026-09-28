@@ -2,8 +2,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppBar } from '../src/components/ui';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import { isSupabaseConfigured } from '../src/data/repositories/supabaseClient';
 import { AppProvider, useApp } from '../src/state/appStore';
@@ -42,14 +43,17 @@ export default function RootLayout(): React.ReactElement {
  * all land back on the splash screen, which routes to log-in.
  */
 function RootStack(): React.ReactElement {
-  const { user } = useApp();
+  const { user, s } = useApp();
 
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: Colors.surface },
-        headerTintColor: Colors.ink,
-        headerTitleStyle: { fontWeight: '700' },
+        header: ({ navigation, options, back }) => (
+          <StackHeader
+            title={typeof options.title === 'string' ? options.title : ''}
+            onBack={back ? navigation.goBack : undefined}
+          />
+        ),
         contentStyle: { backgroundColor: Colors.surfaceAlt },
       }}
     >
@@ -62,14 +66,26 @@ function RootStack(): React.ReactElement {
         <Stack.Screen name="role" options={{ headerShown: false }} />
         <Stack.Screen name="location" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="report" options={{ title: 'Report a Hazard' }} />
-        <Stack.Screen name="verification" options={{ title: 'Verification Panel' }} />
-        <Stack.Screen name="directions" options={{ title: 'Route preview' }} />
-        <Stack.Screen name="routes" options={{ title: 'Saved Routes' }} />
-        <Stack.Screen name="routes-new" options={{ title: 'New route' }} />
-        <Stack.Screen name="my-reports" options={{ title: 'My reports' }} />
+        <Stack.Screen name="report" options={{ headerShown: false }} />
+        <Stack.Screen name="verification" options={{ headerShown: false }} />
+        <Stack.Screen name="directions" options={{ title: s('routePreview') }} />
+        <Stack.Screen name="routes" options={{ title: s('savedRoutes') }} />
+        <Stack.Screen name="routes-new" options={{ title: s('newRoute') }} />
+        <Stack.Screen name="my-reports" options={{ title: s('myReports') }} />
+        <Stack.Screen name="notifications" options={{ title: s('notificationPreferences') }} />
+        <Stack.Screen name="help" options={{ title: s('helpAndSupport') }} />
       </Stack.Protected>
     </Stack>
+  );
+}
+
+/** The white title bar every pushed screen shares, drawn under the status bar. */
+function StackHeader({ title, onBack }: { title: string; onBack?: () => void }): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ paddingTop: insets.top, backgroundColor: Colors.surface }}>
+      <AppBar title={title} leading={onBack ? 'back' : undefined} onLeading={onBack} />
+    </View>
   );
 }
 

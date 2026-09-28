@@ -1,26 +1,38 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Button, StatusBanner } from '../src/components/ui';
+import { AppBar, Badge, Button, StatusBanner } from '../src/components/ui';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { Colors, Radius, Spacing } from '../src/core/theme/colors';
-import { roleDescKey, roleIcon, roleLabelKey } from '../src/core/utils/hazardVisuals';
+import { roleDescKey, roleLabelKey } from '../src/core/utils/hazardVisuals';
 import {
   OFFICIAL_ROLES,
   OfficialRole,
-  SELF_SERVICE_ROLES,
   SelfServiceRole,
   isSelfServiceRole,
 } from '../src/data/models/enums';
 import { useApp } from '../src/state/appStore';
 
 type Choice = SelfServiceRole | OfficialRole;
-const CHOICES: readonly Choice[] = [...SELF_SERVICE_ROLES, ...OFFICIAL_ROLES];
+const CHOICES: readonly Choice[] = ['commuter', 'barangay_official', 'school_admin', 'business_owner'];
 const isOfficial = (role: Choice): role is OfficialRole =>
   (OFFICIAL_ROLES as readonly string[]).includes(role);
+
+function RoleIcon({ role, color }: { role: Choice; color: string }): React.ReactElement {
+  switch (role) {
+    case 'commuter':
+      return <MaterialIcons name="directions-walk" size={24} color={color} />;
+    case 'barangay_official':
+      return <MaterialCommunityIcons name="shield-outline" size={24} color={color} />;
+    case 'school_admin':
+      return <MaterialCommunityIcons name="school-outline" size={24} color={color} />;
+    default:
+      return <MaterialCommunityIcons name="storefront-outline" size={24} color={color} />;
+  }
+}
 
 /**
  * Role picker, shown straight after sign-up and from Profile.
@@ -46,10 +58,12 @@ export default function RoleScreen(): React.ReactElement {
   const managedRole = user !== null && !isSelfServiceRole(user.role);
   const zoneName = (id: string | null): string =>
     data.zones.find((z) => z.id === id)?.name ?? '';
+  // Opened from Profile, as opposed to straight after sign-up.
+  const changing = router.canGoBack();
 
   // From sign-up there is nothing to go back to; from Profile there is.
   const done = (): void => {
-    if (router.canGoBack()) router.back();
+    if (changing) router.back();
     else router.replace('/location');
   };
 
@@ -96,6 +110,7 @@ export default function RoleScreen(): React.ReactElement {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {changing && <AppBar title={s('changeRole')} leading="back" onLeading={() => router.back()} />}
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>{s('chooseRole')}</Text>
         <Text style={styles.subtitle}>{s('chooseRoleSub')}</Text>
@@ -133,61 +148,59 @@ export default function RoleScreen(): React.ReactElement {
           </View>
         )}
 
-        {!managedRole &&
-          CHOICES.map((role) => {
-            const isSelected = selected === role;
-            const blocked = isOfficial(role) && pending !== null;
-            return (
-              <Pressable
-                key={role}
-                onPress={() => {
-                  if (blocked) return;
-                  setSelected(role);
-                  setZoneId(null);
-                  setErrors({});
-                }}
-                disabled={blocked}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: isSelected, disabled: blocked }}
-                style={[
-                  styles.card,
-                  blocked && styles.cardBlocked,
-                  {
-                    backgroundColor: isSelected ? Colors.brandBlueLight : Colors.surface,
-                    borderColor: isSelected ? Colors.brandBlue : Colors.line,
-                    borderWidth: isSelected ? 2 : 1,
-                  },
-                ]}
-              >
-                <View
+        <View style={styles.cards}>
+          {!managedRole &&
+            CHOICES.map((role) => {
+              const isSelected = selected === role;
+              const blocked = isOfficial(role) && pending !== null;
+              return (
+                <Pressable
+                  key={role}
+                  onPress={() => {
+                    if (blocked) return;
+                    setSelected(role);
+                    setZoneId(null);
+                    setErrors({});
+                  }}
+                  disabled={blocked}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected, disabled: blocked }}
                   style={[
-                    styles.iconBox,
-                    { backgroundColor: isSelected ? Colors.brandBlue : Colors.brandBlueLight },
+                    styles.card,
+                    blocked && styles.cardBlocked,
+                    {
+                      backgroundColor: isSelected ? Colors.brandBlueLight : Colors.surface,
+                      borderColor: isSelected ? Colors.brandBlue : Colors.line,
+                      borderWidth: isSelected ? 2 : 1,
+                    },
                   ]}
                 >
+                  <View
+                    style={[
+                      styles.iconBox,
+                      { backgroundColor: isSelected ? Colors.brandBlue : Colors.brandBlueLight },
+                    ]}
+                  >
+                    <RoleIcon role={role} color={isSelected ? Colors.white : Colors.brandBlue} />
+                  </View>
+                  <View style={styles.cardBody}>
+                    <Text style={styles.cardTitle}>{s(roleLabelKey(role))}</Text>
+                    <Text style={styles.cardDesc}>{s(roleDescKey(role))}</Text>
+                    {isOfficial(role) && (
+                      <View style={styles.badgeRow}>
+                        <Badge label={s('needsApproval')} color={Colors.warning} icon="verified-user" compact />
+                      </View>
+                    )}
+                  </View>
                   <MaterialIcons
-                    name={roleIcon(role)}
+                    name={isSelected ? 'radio-button-checked' : 'radio-button-unchecked'}
                     size={24}
-                    color={isSelected ? Colors.white : Colors.brandBlue}
+                    color={isSelected ? Colors.brandBlue : Colors.inkFaint}
                   />
-                </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>{s(roleLabelKey(role))}</Text>
-                  <Text style={styles.cardDesc}>{s(roleDescKey(role))}</Text>
-                  {isOfficial(role) && (
-                    <View style={styles.badgeRow}>
-                      <Badge label={s('needsApproval')} color={Colors.warning} icon="verified-user" compact />
-                    </View>
-                  )}
-                </View>
-                <MaterialIcons
-                  name={isSelected ? 'radio-button-checked' : 'radio-button-unchecked'}
-                  size={24}
-                  color={isSelected ? Colors.brandBlue : Colors.inkFaint}
-                />
-              </Pressable>
-            );
-          })}
+                </Pressable>
+              );
+            })}
+        </View>
 
         {selected && isOfficial(selected) && (
           <View style={styles.request}>
@@ -240,7 +253,13 @@ export default function RoleScreen(): React.ReactElement {
         ) : (
           <>
             <Button
-              label={selected && isOfficial(selected) ? s('submitRequest') : s('next')}
+              label={
+                selected && isOfficial(selected)
+                  ? s('submitRequest')
+                  : changing
+                    ? s('save')
+                    : s('next')
+              }
               onPress={advance}
               disabled={!selected}
               loading={busy}
@@ -262,10 +281,11 @@ export default function RoleScreen(): React.ReactElement {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.surface },
-  scroll: { padding: Spacing.xxl, paddingBottom: Spacing.md },
+  scroll: { paddingHorizontal: 24, paddingTop: Spacing.xxl, paddingBottom: Spacing.md },
   title: { fontSize: 26, fontWeight: '800', color: Colors.ink, letterSpacing: -0.4 },
   subtitle: { fontSize: 14.5, color: Colors.inkMuted, marginTop: Spacing.sm, lineHeight: 21 },
   banner: { marginTop: Spacing.lg },
+  cards: { marginTop: Spacing.md },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -281,9 +301,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardBody: { flex: 1, marginHorizontal: Spacing.md },
+  cardBody: { flex: 1, marginLeft: 14, marginRight: Spacing.sm },
   cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
-  cardDesc: { fontSize: 12.5, color: Colors.inkMuted, marginTop: 3, lineHeight: 18 },
+  cardDesc: { fontSize: 12.5, color: Colors.inkFaint, marginTop: 3, lineHeight: 17.5 },
   badgeRow: { flexDirection: 'row', marginTop: Spacing.sm },
   request: { marginTop: Spacing.xl },
   requestTitle: { fontSize: 18, fontWeight: '800', color: Colors.ink },
@@ -310,6 +330,6 @@ const styles = StyleSheet.create({
   zoneCity: { fontSize: 11.5, color: Colors.inkMuted, marginTop: 1 },
   zoneNameOn: { color: Colors.white },
   error: { fontSize: 12.5, color: Colors.brandRed, marginTop: 5, fontWeight: '600' },
-  footer: { padding: Spacing.xxl, paddingTop: Spacing.md },
+  footer: { paddingHorizontal: 24, paddingTop: Spacing.sm, paddingBottom: 24 },
   secondary: { marginTop: Spacing.md },
 });

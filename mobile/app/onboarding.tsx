@@ -1,9 +1,10 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   Dimensions,
+  LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -16,7 +17,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BantayLogo } from '../src/components/ui/Pins';
 import { Button } from '../src/components/ui';
-import { IconName } from '../src/core/utils/hazardVisuals';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import { StoreKeys } from '../src/data/repositories/storeKeys';
 import { useApp } from '../src/state/appStore';
@@ -28,22 +28,25 @@ export default function OnboardingScreen(): React.ReactElement {
   const { s } = useApp();
   const scroller = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
+  // A horizontal pager does not stretch its pages to its own height, so the
+  // slides are sized to it once it is laid out and centred inside that.
+  const [pagerHeight, setPagerHeight] = useState(0);
 
-  const slides: { icon: IconName; accent: string; title: string; body: string }[] = [
+  const slides: { icon: React.ReactElement; accent: string; title: string; body: string }[] = [
     {
-      icon: 'travel-explore',
+      icon: <MaterialIcons name="travel-explore" size={52} color={Colors.brandRed} />,
       accent: Colors.brandRed,
       title: s('onboardTitle1'),
       body: s('onboardBody1'),
     },
     {
-      icon: 'verified-user',
+      icon: <MaterialCommunityIcons name="shield-check-outline" size={52} color={Colors.brandBlue} />,
       accent: Colors.brandBlue,
       title: s('onboardTitle2'),
       body: s('onboardBody2'),
     },
     {
-      icon: 'notifications-active',
+      icon: <MaterialCommunityIcons name="bell-ring-outline" size={52} color={Colors.safe} />,
       accent: Colors.safe,
       title: s('onboardTitle3'),
       body: s('onboardBody3'),
@@ -84,13 +87,17 @@ export default function OnboardingScreen(): React.ReactElement {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScroll}
+        onLayout={(e: LayoutChangeEvent) => setPagerHeight(e.nativeEvent.layout.height)}
         style={styles.pager}
       >
         {slides.map((slide) => (
-          <View key={slide.title} style={[styles.slide, { width }]}>
+          <View
+            key={slide.title}
+            style={[styles.slide, { width, height: pagerHeight || undefined }]}
+          >
             <View style={[styles.iconOuter, { backgroundColor: `${slide.accent}1A` }]}>
               <View style={[styles.iconInner, { backgroundColor: `${slide.accent}29` }]}>
-                <MaterialIcons name={slide.icon} size={52} color={slide.accent} />
+                {slide.icon}
               </View>
             </View>
             <Text style={styles.title}>{slide.title}</Text>
@@ -128,14 +135,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
+    paddingLeft: Spacing.xl,
+    paddingRight: 24,
     paddingTop: Spacing.md,
   },
-  brand: { fontSize: 19, fontWeight: '800', color: Colors.brandBlue, marginLeft: Spacing.sm },
+  brand: { fontSize: 19, fontWeight: '800', color: Colors.brandBlue, marginLeft: 10 },
   spacer: { flex: 1 },
   skip: { fontSize: 15.5, fontWeight: '700', color: Colors.brandBlue },
   pager: { flex: 1 },
-  slide: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  slide: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 24 },
   iconOuter: {
     width: 168,
     height: 168,
@@ -152,7 +160,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     color: Colors.ink,
     textAlign: 'center',
     marginTop: 44,
@@ -162,9 +170,9 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: Colors.inkMuted,
     textAlign: 'center',
-    marginTop: Spacing.lg,
+    marginTop: 14,
   },
-  footer: { paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.xxl },
-  dots: { flexDirection: 'row', justifyContent: 'center', marginBottom: Spacing.xxl },
+  footer: { paddingHorizontal: 24, paddingBottom: Spacing.xxl },
+  dots: { flexDirection: 'row', justifyContent: 'center', marginBottom: 26 },
   dot: { height: 8, borderRadius: 4, marginHorizontal: 4 },
 });

@@ -113,6 +113,11 @@ export const Geo = {
     return `${(meters / 1000).toFixed(meters < 10000 ? 1 : 0)} km`;
   },
 
+  /** An alert radius in kilometres, as the settings show it: "500 m", "2.0 km". */
+  formatRadius(km: number): string {
+    return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+  },
+
   /** Rough walking time at a 1.35 m/s city pace, in seconds. */
   walkingTimeSeconds: (meters: number): number => Math.round(meters / 1.35),
 

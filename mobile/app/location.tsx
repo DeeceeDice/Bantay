@@ -44,15 +44,14 @@ export default function LocationScreen(): React.ReactElement {
         </View>
         <Text style={styles.title}>{s('locationTitle')}</Text>
         <Text style={styles.text}>{s('locationBody')}</Text>
-      </View>
-      <View style={styles.footer}>
         <Button
           label={s('allowLocation')}
           icon="location-on"
           onPress={allow}
           loading={busy}
+          style={styles.allow}
         />
-        <Pressable onPress={notNow} disabled={busy} style={styles.notNow} hitSlop={10}>
+        <Pressable onPress={notNow} disabled={busy} style={styles.notNow}>
           <Text style={styles.notNowText}>{s('notNow')}</Text>
         </Pressable>
       </View>
@@ -62,8 +61,18 @@ export default function LocationScreen(): React.ReactElement {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.surface },
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxl },
+  body: {
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.xxl,
+    paddingTop: 24,
+    paddingBottom: Spacing.xxl,
+  },
   iconCircle: {
+    alignSelf: 'center',
     width: 152,
     height: 152,
     borderRadius: 76,
@@ -83,9 +92,9 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: Colors.inkMuted,
     textAlign: 'center',
-    marginTop: Spacing.lg,
+    marginTop: 14,
   },
-  footer: { padding: Spacing.xxl },
-  notNow: { alignItems: 'center', paddingVertical: Spacing.lg },
+  allow: { marginTop: 40 },
+  notNow: { alignItems: 'center', justifyContent: 'center', minHeight: 48, marginTop: 10 },
   notNowText: { fontSize: 15.5, fontWeight: '700', color: Colors.brandBlue },
 });

@@ -106,6 +106,7 @@ export function Button({
   variant = 'primary',
   icon,
   color,
+  borderColor,
   style,
 }: {
   label: string;
@@ -115,6 +116,7 @@ export function Button({
   variant?: 'primary' | 'outline' | 'text';
   icon?: IconName;
   color?: string;
+  borderColor?: string;
   style?: ViewStyle;
 }): React.ReactElement {
   const isDisabled = disabled || loading;
@@ -136,7 +138,7 @@ export function Button({
         styles.button,
         {
           backgroundColor: background,
-          borderColor: variant === 'outline' ? Colors.line : 'transparent',
+          borderColor: variant === 'outline' ? (borderColor ?? Colors.line) : 'transparent',
           borderWidth: variant === 'outline' ? 1.5 : 0,
           opacity: pressed && !isDisabled ? 0.85 : 1,
         },
@@ -162,6 +164,142 @@ export function Button({
       )}
     </Pressable>
   );
+}
+
+/**
+ * The white bar across the top of a screen: optional back or close button,
+ * the title, and an optional text action on the right. Material's app bar, as
+ * the app has always drawn it.
+ */
+export function AppBar({
+  title,
+  leading,
+  onLeading,
+  actionLabel,
+  onAction,
+  right,
+}: {
+  title: string;
+  leading?: 'back' | 'close';
+  onLeading?: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
+  /** Any other control for the right-hand end, such as a view toggle. */
+  right?: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <View style={styles.appBar}>
+      {leading && (
+        <Pressable
+          onPress={onLeading}
+          hitSlop={8}
+          style={styles.appBarLeading}
+          accessibilityRole="button"
+          accessibilityLabel={leading === 'close' ? 'Close' : 'Back'}
+        >
+          <MaterialIcons name={leading === 'close' ? 'close' : 'arrow-back'} size={24} color={Colors.ink} />
+        </Pressable>
+      )}
+      <Text style={[styles.appBarTitle, leading && styles.appBarTitleIndented]} numberOfLines={1}>
+        {title}
+      </Text>
+      {actionLabel && onAction && (
+        <Pressable onPress={onAction} hitSlop={8} style={styles.appBarAction} accessibilityRole="button">
+          <Text style={styles.appBarActionText}>{actionLabel}</Text>
+        </Pressable>
+      )}
+      {right}
+    </View>
+  );
+}
+
+/** Material's outlined segmented button: a centred pill of equal segments. */
+export function SegmentedButton<T extends string | boolean>({
+  segments,
+  value,
+  onChange,
+  compact = false,
+}: {
+  segments: { value: T; label?: string; icon?: React.ReactNode; accessibilityLabel?: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  compact?: boolean;
+}): React.ReactElement {
+  return (
+    <View style={[styles.segmented, compact && styles.segmentedCompact]}>
+      {segments.map((segment, i) => {
+        const selected = segment.value === value;
+        return (
+          <Pressable
+            key={String(segment.value)}
+            onPress={() => onChange(segment.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={segment.accessibilityLabel ?? segment.label}
+            style={[
+              styles.segment,
+              compact && styles.segmentCompact,
+              i > 0 && styles.segmentDivider,
+              selected && styles.segmentSelected,
+            ]}
+          >
+            {segment.icon}
+            {segment.label !== undefined && (
+              <Text style={styles.segmentText} numberOfLines={1}>
+                {segment.label}
+              </Text>
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * One tappable line in a grouped settings card: icon, label, an optional
+ * value on the right, and a chevron.
+ */
+export function NavRow({
+  icon,
+  label,
+  description,
+  trailing,
+  onPress,
+  highlight = false,
+}: {
+  icon: IconName;
+  label: string;
+  description?: string;
+  trailing?: string;
+  onPress: () => void;
+  highlight?: boolean;
+}): React.ReactElement {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <MaterialIcons name={icon} size={20} color={highlight ? Colors.safe : Colors.inkMuted} />
+      <View style={styles.navRowBody}>
+        <Text
+          style={[styles.navRowLabel, { color: highlight ? Colors.safeDark : Colors.ink }]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        {description && <Text style={styles.navRowDesc}>{description}</Text>}
+      </View>
+      {trailing && <Text style={styles.navRowTrailing}>{trailing}</Text>}
+      <MaterialIcons name="chevron-right" size={20} color={Colors.inkFaint} />
+    </Pressable>
+  );
+}
+
+/** The hairline between rows of a grouped card. */
+export function Divider(): React.ReactElement {
+  return <View style={styles.divider} />;
 }
 
 /** Shown wherever a list has nothing in it yet. */
@@ -210,7 +348,7 @@ export function StatusBanner({
       </View>
       {action}
       {onDismiss && (
-        <Pressable onPress={onDismiss} hitSlop={10} accessibilityLabel="Dismiss">
+        <Pressable onPress={onDismiss} style={styles.bannerClose} accessibilityLabel="Dismiss">
           <MaterialIcons name="close" size={18} color={Colors.white} />
         </Pressable>
       )}
@@ -238,7 +376,51 @@ export function StatTile({
   );
 }
 
+/** Material 3's outline and selected-segment tones for the brand blue. */
+const OUTLINE = '#74777F';
+const SEGMENT_SELECTED = '#DAE2F9';
+
 const styles = StyleSheet.create({
+  appBar: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.lg,
+  },
+  appBarLeading: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
+  appBarTitle: { flex: 1, fontSize: 19, fontWeight: '700', color: Colors.ink },
+  appBarTitleIndented: { marginLeft: Spacing.lg },
+  appBarAction: { minHeight: MIN_TAP_TARGET, justifyContent: 'center', paddingHorizontal: Spacing.sm },
+  appBarActionText: { fontSize: 15.5, fontWeight: '700', color: Colors.brandBlue },
+  segmented: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: OUTLINE,
+    overflow: 'hidden',
+  },
+  segmentedCompact: { alignSelf: 'auto', height: 32, borderRadius: 16 },
+  segment: { minWidth: 150, paddingHorizontal: Spacing.md, alignItems: 'center', justifyContent: 'center' },
+  segmentCompact: { minWidth: 0 },
+  segmentDivider: { borderLeftWidth: 1, borderLeftColor: OUTLINE },
+  segmentSelected: { backgroundColor: SEGMENT_SELECTED },
+  segmentText: { fontSize: 14.5, fontWeight: '500', color: Colors.ink },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: Spacing.lg,
+    paddingRight: 14,
+    paddingVertical: 15,
+  },
+  navRowPressed: { backgroundColor: Colors.surfaceAlt },
+  navRowBody: { flex: 1, marginLeft: 14 },
+  navRowLabel: { fontSize: 16, fontWeight: '700' },
+  navRowDesc: { fontSize: 12.5, lineHeight: 17.5, color: Colors.inkFaint, marginTop: 2 },
+  navRowTrailing: { fontSize: 12.5, color: Colors.inkFaint, marginLeft: Spacing.sm, marginRight: 6 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.line },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -286,12 +468,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     borderRadius: Radius.md,
-    padding: Spacing.md,
+    paddingLeft: 14,
+    paddingRight: 10,
+    paddingVertical: Spacing.md,
     ...Shadow.floating,
   },
-  bannerBody: { flex: 1, marginHorizontal: Spacing.md },
+  bannerBody: { flex: 1, marginLeft: Spacing.md, marginRight: Spacing.sm },
+  bannerClose: {
+    width: 32,
+    height: 40,
+    marginVertical: -8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bannerTitle: { color: Colors.white, fontWeight: '700', fontSize: 15, lineHeight: 19 },
-  bannerMessage: { color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 18, marginTop: 3 },
+  bannerMessage: { color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 17.5, marginTop: 3 },
   statTile: {
     flex: 1,
     borderRadius: Radius.md,

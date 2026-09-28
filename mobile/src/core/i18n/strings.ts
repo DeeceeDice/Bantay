@@ -122,6 +122,9 @@ const COPY = {
   ],
   hazardNearbyTitle: ['Hazard reported nearby', 'May panganib sa malapit'],
   jumpToHazard: ['View hazard', 'Tingnan'],
+  hazardOne: ['hazard', 'hazard'],
+  hazardMany: ['hazards', 'hazards'],
+  away: ['away', 'ang layo'],
   filters: ['Filters', 'Mga Filter'],
   showVerifiedOnly: ['Show verified only', 'Beripikado lang'],
   showSafeSpots: ['Show safe spots', 'Ipakita ang ligtas na lugar'],
@@ -151,6 +154,13 @@ const COPY = {
 
   reportHazard: ['Report a Hazard', 'Mag-report ng Panganib'],
   step: ['Step', 'Hakbang'],
+  discardReport: [
+    'Your unfinished report will be discarded. Leave anyway?',
+    'Mawawala ang report na sinisimulan mo. Ituloy?',
+  ],
+  severityCautionDesc: ['Still passable, but take care.', 'Nadadaanan pa pero mag-ingat.'],
+  severityBlockedDesc: ['Blocked. No one can get through.', 'Hindi madaanan.'],
+  severityDangerDesc: ['Immediate danger to anyone nearby.', 'Delikado sa buhay ng mga malapit.'],
   stepLocationTitle: ['Where is the hazard?', 'Nasaan ang panganib?'],
   stepLocationBody: [
     'Drag the map to move the pin. It starts at your current location.',
@@ -208,6 +218,7 @@ const COPY = {
   allCaughtUp: ['All caught up.', 'Wala nang bago.'],
 
   safeSpots: ['Safe Spots', 'Ligtas na Lugar'],
+  noSafeSpots: ['No safe spots in this category yet.', 'Walang ligtas na lugar sa kategoryang ito.'],
   allCategories: ['All', 'Lahat'],
   categoryMalls: ['Malls', 'Mall'],
   categorySchools: ['Schools', 'Paaralan'],
@@ -216,6 +227,7 @@ const COPY = {
   openNow: ['Open now', 'Bukas ngayon'],
   closedNow: ['Closed', 'Sarado'],
   subscribe: ['Subscribe', 'Mag-subscribe'],
+  directions: ['Directions', 'Direksyon'],
   subscribed: ['Subscribed', 'Naka-subscribe'],
   subscribedToast: [
     'Subscribed. We will alert you when this changes.',
@@ -264,7 +276,7 @@ const COPY = {
   reportsVerifiedStat: ['Verified', 'Beripikado'],
   trustScore: ['Trust score', 'Trust score'],
   verificationsDone: ['Verifications', 'Beripikasyon'],
-  notificationPreferences: ['Alerts & settings', 'Alerto at setting'],
+  notificationPreferences: ['Notification preferences', 'Setting ng abiso'],
   alertRadius: ['Alert radius', 'Alert radius'],
   alertRadiusDesc: [
     'How far from you a hazard must be before Bantay alerts you.',
@@ -274,6 +286,31 @@ const COPY = {
   english: ['English', 'English'],
   filipino: ['Filipino', 'Filipino'],
   helpAndSupport: ['Help & Support', 'Tulong at Suporta'],
+  faqQ1: ['How do I report a hazard?', 'Paano mag-report ng panganib?'],
+  faqA1: [
+    'Tap the red "+" button on the map, place the pin, choose the hazard type and severity, attach a photo and submit. Your report appears immediately as an orange pin while it waits for verification.',
+    'I-tap ang pulang "+" sa mapa, ilagay ang pin, piliin ang uri at bigat ng panganib, maglakip ng litrato at isumite. Agad itong lalabas bilang orange na pin habang naghihintay ng beripikasyon.',
+  ],
+  faqQ2: ['Who verifies reports?', 'Sino ang nagbeberipika?'],
+  faqA2: [
+    'Barangay officials and school admins approved for the affected area review each report. Once verified, the pin turns red and is shown to everyone.',
+    'Ang mga opisyal ng barangay at school admin na inaprubahan para sa lugar ang sumusuri sa bawat report. Kapag beripikado na, nagiging pula ang pin at nakikita ng lahat.',
+  ],
+  faqQ3: ['What if I have no internet?', 'Paano kung walang internet?'],
+  faqA3: [
+    'Bantay needs a connection to load the map, send reports and receive alerts. If a report fails to send, you will see an error; try again once you are back online.',
+    'Kailangan ng Bantay ng koneksyon para i-load ang mapa, magpadala ng report at tumanggap ng alerto. Kapag hindi naipadala ang report, may lalabas na error; subukan ulit kapag may koneksyon na.',
+  ],
+  faqQ4: ['How is my trust score calculated?', 'Paano kinakalkula ang trust score ko?'],
+  faqA4: [
+    'It starts at 50 and moves with the share of your reports that get verified rather than rejected, plus a small bonus for consistent accurate reporting.',
+    'Nagsisimula ito sa 50 at gumagalaw base sa bahagi ng mga report mong nabeberipika kaysa natatanggihan, kasama ang maliit na bonus sa tuloy-tuloy na tamang pag-report.',
+  ],
+  faqQ5: ['Is my location shared?', 'Naibabahagi ba ang lokasyon ko?'],
+  faqA5: [
+    'No. Your live location stays on your device. Only the coordinates of hazards you choose to report are published, and they are attributed to your display name, never your exact position.',
+    'Hindi. Nananatili sa device mo ang live mong lokasyon. Ang koordinada lang ng panganib na pinili mong i-report ang inilalathala, at nakalagay ito sa display name mo, hindi sa eksaktong kinaroroonan mo.',
+  ],
   myReports: ['My reports', 'Aking mga report'],
   noReportsYet: ['You have not filed any reports yet.', 'Wala ka pang naisumiteng report.'],
   logOutConfirmTitle: ['Log out?', 'Mag-log out?'],
@@ -282,6 +319,7 @@ const COPY = {
     'Kailangan mong mag-log in ulit para makapag-report.',
   ],
   changeRole: ['Change role', 'Palitan ang role'],
+  save: ['Save', 'I-save'],
   justNow: ['just now', 'ngayon lang'],
   minAgo: ['min ago', 'min ang nakalipas'],
   hoursAgo: ['hours ago', 'oras ang nakalipas'],

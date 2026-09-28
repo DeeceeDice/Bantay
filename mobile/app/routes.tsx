@@ -1,16 +1,18 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState } from '../src/components/ui';
-import { Colors, Spacing } from '../src/core/theme/colors';
+import { BantayMap } from '../src/components/map/BantayMap';
+import { useMapController } from '../src/components/map/useMapController';
+import { Badge, Card, EmptyState } from '../src/components/ui';
+import { Colors, Radius, Shadow, Spacing } from '../src/core/theme/colors';
 import { severityColor } from '../src/core/utils/hazardVisuals';
-import { routePath } from '../src/data/models/types';
+import { SavedRoute, routePath } from '../src/data/models/types';
 import { statusForRoute } from '../src/data/repositories/logic';
 import { useApp } from '../src/state/appStore';
 
-/** Saved commutes with a live "Clear" / "N hazards" status badge. */
+/** Saved commutes, each with a map preview and a live "Clear" / "N hazards" badge. */
 export default function RoutesScreen(): React.ReactElement {
   const { s, data, deleteRoute, restoreRoute } = useApp();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function RoutesScreen(): React.ReactElement {
               <Card
                 key={route.id}
                 borderColor={status.hazardCount === 0 ? Colors.line : `${color}66`}
+                padded={false}
                 style={styles.card}
                 onPress={() =>
                   router.push({
@@ -68,14 +71,12 @@ export default function RoutesScreen(): React.ReactElement {
                   })
                 }
               >
+                <RoutePreview route={route} color={color} />
                 <View style={styles.cardRow}>
                   <View style={styles.cardBody}>
                     <Text style={styles.cardTitle}>{route.label}</Text>
                     <Text style={styles.cardSub} numberOfLines={1}>
-                      {route.startLabel} → {route.endLabel}
-                    </Text>
-                    <Text style={styles.cardMeta}>
-                      {routePath(route).length} points
+                      {route.startLabel}  →  {route.endLabel}
                     </Text>
                   </View>
                   <View style={styles.cardActions}>
@@ -83,7 +84,9 @@ export default function RoutesScreen(): React.ReactElement {
                       label={
                         status.hazardCount === 0
                           ? s('statusClear')
-                          : String(status.hazardCount)
+                          : `${status.hazardCount} ${
+                              status.hazardCount === 1 ? s('hazardOne') : s('hazardMany')
+                            }`
                       }
                       color={color}
                       icon={status.hazardCount === 0 ? 'check-circle' : 'warning'}
@@ -106,28 +109,84 @@ export default function RoutesScreen(): React.ReactElement {
         </ScrollView>
       )}
 
-      <View style={styles.footer}>
-        <Button label={s('addRoute')} icon="add" onPress={() => router.push('/routes-new')} />
-      </View>
+      <Pressable
+        onPress={() => router.push('/routes-new')}
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        accessibilityRole="button"
+      >
+        <MaterialIcons name="add" size={24} color={Colors.white} />
+        <Text style={styles.fabLabel}>{s('addRoute')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** A still map of the route, drawn in its status colour. */
+function RoutePreview({ route, color }: { route: SavedRoute; color: string }): React.ReactElement {
+  const controller = useMapController({ center: route.start, zoom: 15 });
+  // Once: the fit waits for the map's first layout, and the preview never
+  // moves after that.
+  useEffect(() => {
+    controller.fitPoints(routePath(route), { top: 28, right: 28, bottom: 28, left: 28 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <View style={styles.preview} pointerEvents="none">
+      <BantayMap
+        controller={controller}
+        interactive={false}
+        showAttribution={false}
+        dimTiles
+        polylines={[{ points: routePath(route), color, borderColor: Colors.white, width: 5 }]}
+        markers={[
+          {
+            id: 'start',
+            point: route.start,
+            width: 14,
+            height: 14,
+            anchor: 'centre',
+            render: () => <View style={[styles.endpoint, { backgroundColor: Colors.brandBlue }]} />,
+          },
+          {
+            id: 'end',
+            point: route.end,
+            width: 14,
+            height: 14,
+            anchor: 'centre',
+            render: () => <View style={[styles.endpoint, { backgroundColor: Colors.brandRed }]} />,
+          },
+        ]}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surfaceAlt },
-  list: { padding: Spacing.lg, gap: Spacing.md },
-  card: { padding: Spacing.lg },
-  cardRow: { flexDirection: 'row', alignItems: 'center' },
-  cardBody: { flex: 1 },
+  list: { padding: Spacing.lg, paddingBottom: 96, gap: Spacing.md },
+  card: { overflow: 'hidden' },
+  preview: { height: 108 },
+  endpoint: { flex: 1, borderRadius: 7, borderWidth: 2.5, borderColor: Colors.white },
+  cardRow: { flexDirection: 'row', alignItems: 'center', padding: 14 },
+  cardBody: { flex: 1, marginRight: 10 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
-  cardSub: { fontSize: 12.5, color: Colors.inkMuted, marginTop: 3 },
-  cardMeta: { fontSize: 11.5, color: Colors.inkFaint, marginTop: 3 },
-  cardActions: { alignItems: 'flex-end', gap: Spacing.sm },
+  cardSub: { fontSize: 12.5, lineHeight: 17.5, color: Colors.inkFaint, marginTop: 3 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   deleteButton: { padding: Spacing.xs },
-  footer: {
-    padding: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.line,
-    backgroundColor: Colors.surface,
+  fab: {
+    position: 'absolute',
+    right: Spacing.lg,
+    bottom: Spacing.lg,
+    height: 56,
+    borderRadius: Radius.md,
+    paddingLeft: Spacing.lg,
+    paddingRight: Spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.brandRed,
+    ...Shadow.floating,
   },
+  fabPressed: { opacity: 0.9 },
+  fabLabel: { color: Colors.white, fontSize: 15.5, fontWeight: '700', marginLeft: Spacing.md },
 });

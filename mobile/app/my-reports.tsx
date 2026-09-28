@@ -100,12 +100,12 @@ const STATUS_ICON = {
 const styles = StyleSheet.create({
   reason: { fontSize: 12.5, color: Colors.inkMuted, marginTop: Spacing.sm, lineHeight: 18 },
   container: { flex: 1, backgroundColor: Colors.surfaceAlt },
-  list: { padding: Spacing.lg, gap: Spacing.md },
-  card: { padding: Spacing.lg },
+  list: { padding: Spacing.lg, paddingBottom: Spacing.xxl, gap: Spacing.md },
+  card: { padding: 14 },
   row: { flexDirection: 'row' },
   photo: { width: 62, height: 62, borderRadius: 10, overflow: 'hidden' },
-  body: { flex: 1, marginLeft: Spacing.md },
+  body: { flex: 1, marginLeft: 13 },
   title: { fontSize: 16, fontWeight: '700', color: Colors.ink },
-  sub: { fontSize: 12.5, color: Colors.inkMuted, marginTop: 2 },
+  sub: { fontSize: 12.5, color: Colors.inkFaint, marginTop: 2 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },
 });

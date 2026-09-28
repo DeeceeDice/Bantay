@@ -89,24 +89,26 @@ export default function LoginScreen(): React.ReactElement {
         onSubmitEditing={submit}
         testID="login-password"
       />
-      <Button label={s('logIn')} onPress={submit} loading={busy} />
+      <Button label={s('logIn')} onPress={submit} loading={busy} style={styles.submit} />
     </AuthScaffold>
   );
 }
 
 const styles = StyleSheet.create({
+  submit: { marginTop: 10 },
   footer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: Spacing.xl,
+    marginTop: 22,
   },
   footerText: { color: Colors.inkMuted, fontSize: 14.5 },
   footerLink: {
     color: Colors.brandBlue,
     fontWeight: '700',
-    fontSize: 15,
-    marginLeft: Spacing.sm,
+    fontSize: 15.5,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
 });

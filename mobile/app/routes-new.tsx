@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -87,6 +88,7 @@ export default function NewRouteScreen(): React.ReactElement {
   return (
     <View style={styles.container}>
       <View style={styles.hint}>
+        <MaterialCommunityIcons name="gesture-tap" size={18} color={Colors.brandBlueDark} />
         <Text style={styles.hintText}>
           {!start ? `${s('setStart')}. ${s('tapMapToSet')}` : !end ? `${s('setEnd')}. ${s('tapMapToSet')}` : s('saveRoute')}
         </Text>
@@ -149,12 +151,19 @@ function Endpoint({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surface },
-  hint: { backgroundColor: Colors.brandBlueLight, padding: Spacing.md },
+  hint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.brandBlueLight,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: 10,
+  },
   hintText: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: Colors.brandBlueDark,
-    textAlign: 'center',
+    marginLeft: 10,
   },
   mapWrap: { flex: 1 },
   footer: {

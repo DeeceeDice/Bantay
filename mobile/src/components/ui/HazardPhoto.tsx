@@ -45,7 +45,7 @@ export function HazardPhoto({
       >
         <MaterialIcons name={hazardIcon(type)} size={36} color={Colors.brandBlue} />
         <Text style={styles.sampleLabel}>
-          {failed ? 'Photo unavailable' : uri ? 'Sample photo' : 'No photo'}
+          {uri && !failed ? 'Sample photo' : 'No photo'}
         </Text>
       </View>
     );

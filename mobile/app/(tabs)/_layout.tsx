@@ -1,11 +1,38 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Tabs, router } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
+import { ColorValue, Platform, Text } from 'react-native';
 
 import { Colors } from '../../src/core/theme/colors';
 import { unreadCount } from '../../src/data/repositories/logic';
 import { useApp } from '../../src/state/appStore';
+
+type Glyph =
+  | { set: 'material'; name: React.ComponentProps<typeof MaterialIcons>['name'] }
+  | { set: 'community'; name: React.ComponentProps<typeof MaterialCommunityIcons>['name'] };
+
+/** Outlined when the tab is not selected, filled when it is. */
+function tabIcon(outlined: Glyph, filled: Glyph) {
+  return function TabIcon({ focused, color }: { focused: boolean; color: ColorValue }) {
+    const glyph = focused ? filled : outlined;
+    return glyph.set === 'community' ? (
+      <MaterialCommunityIcons name={glyph.name} size={24} color={color} />
+    ) : (
+      <MaterialIcons name={glyph.name} size={24} color={color} />
+    );
+  };
+}
+
+function TabLabel({ focused, color, children }: { focused: boolean; color: ColorValue; children: string }) {
+  return (
+    <Text
+      numberOfLines={1}
+      style={{ fontSize: 10.5, fontWeight: focused ? '700' : '600', color, marginTop: 3 }}
+    >
+      {children}
+    </Text>
+  );
+}
 
 /**
  * The signed-in app: five tabs with a persistent bottom navigation bar.
@@ -29,24 +56,23 @@ export default function TabsLayout(): React.ReactElement {
           height: Platform.OS === 'ios' ? 86 : 62,
           paddingTop: 6,
         },
-        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '600' },
+        tabBarLabel: TabLabel,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: s('tabMap'),
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="map" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon({ set: 'community', name: 'map-outline' }, { set: 'material', name: 'map' }),
         }}
       />
       <Tabs.Screen
         name="report-tab"
         options={{
           title: s('tabReport'),
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="add-circle-outline" size={size} color={color} />
+          tabBarIcon: tabIcon(
+            { set: 'material', name: 'add-circle-outline' },
+            { set: 'material', name: 'add-circle' },
           ),
         }}
         listeners={{
@@ -62,9 +88,20 @@ export default function TabsLayout(): React.ReactElement {
         options={{
           title: s('tabAlerts'),
           tabBarBadge: unread > 0 ? unread : undefined,
-          tabBarBadgeStyle: { backgroundColor: Colors.brandRed, fontSize: 10 },
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="notifications-none" size={size} color={color} />
+          tabBarBadgeStyle: {
+            backgroundColor: Colors.brandRed,
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: '800',
+            minWidth: 17,
+            height: 17,
+            lineHeight: 14,
+            borderWidth: 1.5,
+            borderColor: Colors.surface,
+          },
+          tabBarIcon: tabIcon(
+            { set: 'material', name: 'notifications-none' },
+            { set: 'material', name: 'notifications' },
           ),
         }}
       />
@@ -72,17 +109,16 @@ export default function TabsLayout(): React.ReactElement {
         name="safe-spots"
         options={{
           title: s('tabSafeSpots'),
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="shield" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon({ set: 'community', name: 'shield-outline' }, { set: 'material', name: 'shield' }),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: s('tabProfile'),
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="person-outline" size={size} color={color} />
+          tabBarIcon: tabIcon(
+            { set: 'material', name: 'person-outline' },
+            { set: 'material', name: 'person' },
           ),
         }}
       />

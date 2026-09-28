@@ -1,7 +1,16 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BantayMap, MapCircle, MapMarker } from '../../src/components/map/BantayMap';
@@ -13,6 +22,7 @@ import { Sheet } from '../../src/components/ui/Sheet';
 import { Geo } from '../../src/core/geo/latLng';
 import { Colors, Radius, Shadow, Spacing } from '../../src/core/theme/colors';
 import {
+  hazardIcon,
   hazardLabelKey,
   safeSpotIcon,
   severityColor,
@@ -20,7 +30,7 @@ import {
   severityLabelKey,
   statusColor,
 } from '../../src/core/utils/hazardVisuals';
-import { timeAgo } from '../../src/core/utils/timeAgo';
+import { formatDuration, timeAgo } from '../../src/core/utils/timeAgo';
 import { isAwaitingReview } from '../../src/data/models/enums';
 import { SafetyCheckResult } from '../../src/data/models/types';
 import { checkSafety } from '../../src/data/repositories/logic';
@@ -168,10 +178,10 @@ export default function MapScreen(): React.ReactElement {
     out.push({
       id: 'user',
       point: userPoint,
-      width: 22,
-      height: 22,
+      width: 46,
+      height: 46,
       anchor: 'centre',
-      render: () => <UserLocationDot stale={!hasRealFix} />,
+      render: () => <UserLocationDot size={46} stale={!hasRealFix} />,
     });
 
     return out;
@@ -200,6 +210,7 @@ export default function MapScreen(): React.ReactElement {
 
   const selectedReport = data.reports.find((r) => r.id === selectedReportId) ?? null;
   const selectedSpot = data.safeSpots.find((sp) => sp.id === selectedSpotId) ?? null;
+  const spotSubscribed = selectedSpot !== null && data.subscribedSpotIds.includes(selectedSpot.id);
   const activeFilters =
     (!settings.layers.includes('pending_reports') ? 1 : 0) +
     (!settings.layers.includes('safe_spots') ? 1 : 0);
@@ -306,7 +317,9 @@ export default function MapScreen(): React.ReactElement {
                 ? undefined
                 : safety?.isSafe
                   ? s('safeZoneBody')
-                  : `${safety?.hazards.length} - ${Geo.formatDistance(safety?.nearestDistanceMeters ?? 0)}`
+                  : `${safety?.hazards.length ?? 0} ${
+                      safety?.hazards.length === 1 ? s('hazardOne') : s('hazardMany')
+                    } - ${Geo.formatDistance(safety?.nearestDistanceMeters ?? 0)} ${s('away')}`
             }
             color={
               checking
@@ -341,7 +354,9 @@ export default function MapScreen(): React.ReactElement {
             controller.moveTo(userPoint, 16);
           }}
         />
+        <View style={styles.mapControlGap} />
         <MapButton icon="add" small onPress={() => controller.zoomBy(1)} />
+        <View style={styles.mapControlGapSmall} />
         <MapButton icon="remove" small onPress={() => controller.zoomBy(-1)} />
       </View>
 
@@ -351,7 +366,11 @@ export default function MapScreen(): React.ReactElement {
           style={styles.safetyButton}
           accessibilityRole="button"
         >
-          <MaterialIcons name="shield" size={21} color={Colors.brandBlue} />
+          {checking ? (
+            <ActivityIndicator size="small" color={Colors.brandBlue} />
+          ) : (
+            <MaterialCommunityIcons name="shield-outline" size={21} color={Colors.brandBlue} />
+          )}
           <Text style={styles.safetyLabel} numberOfLines={1}>
             {checking ? s('checkingSurroundings') : s('amISafeHere')}
           </Text>
@@ -378,7 +397,7 @@ export default function MapScreen(): React.ReactElement {
                 ]}
               >
                 <MaterialIcons
-                  name={severityIcon(selectedReport.severity)}
+                  name={hazardIcon(selectedReport.type)}
                   size={24}
                   color={statusColor(selectedReport.status)}
                 />
@@ -419,25 +438,35 @@ export default function MapScreen(): React.ReactElement {
             {selectedReport.description.length > 0 && (
               <Text style={styles.description}>{selectedReport.description}</Text>
             )}
-            <Text style={styles.meta}>
-              {timeAgo(selectedReport.reportedAt, settings.language)} ·{' '}
-              {s('reportedBy')} {selectedReport.reporterName}
-            </Text>
-            {selectedReport.verifiedBy && (
-              <Text style={[styles.meta, { color: Colors.safeDark }]}>
-                {s('verifiedByLabel')} {selectedReport.verifiedBy}
-              </Text>
-            )}
+            <View style={styles.metaRows}>
+              <MetaRow icon="schedule" label={timeAgo(selectedReport.reportedAt, settings.language)} />
+              <MetaRow icon="person-outline" label={`${s('reportedBy')} ${selectedReport.reporterName}`} />
+              {selectedReport.verifiedBy && (
+                <MetaRow
+                  icon="verified-user"
+                  label={`${s('verifiedByLabel')} ${selectedReport.verifiedBy}`}
+                  color={Colors.safe}
+                />
+              )}
+            </View>
 
             <View style={styles.votePanel}>
               <View style={styles.voteHeader}>
                 <Text style={styles.voteTitle}>{s('stillThereQuestion')}</Text>
-                <Text style={styles.voteCount}>
-                  {selectedReport.confirmCount} {s('confirmations')}
-                </Text>
+                <MaterialIcons name="how-to-vote" size={16} color={Colors.safe} />
+                <Text style={styles.voteCount}>{selectedReport.confirmCount}</Text>
               </View>
+              <Text style={styles.voteSummary}>
+                {selectedReport.confirmCount} {s('confirmations')}
+                {selectedReport.denyCount > 0
+                  ? `  -  ${selectedReport.denyCount} ${s('no').toLowerCase()}`
+                  : ''}
+              </Text>
               {user && selectedReport.votedUserIds.includes(user.id) ? (
-                <Text style={styles.voted}>{s('thanksForConfirming')}</Text>
+                <View style={styles.votedRow}>
+                  <MaterialIcons name="check-circle" size={18} color={Colors.safe} />
+                  <Text style={styles.voted}>{s('thanksForConfirming')}</Text>
+                </View>
               ) : (
                 <View style={styles.voteButtons}>
                   <Button
@@ -445,6 +474,7 @@ export default function MapScreen(): React.ReactElement {
                     variant="outline"
                     icon="thumb-up-off-alt"
                     color={Colors.safe}
+                    borderColor={`${Colors.safe}66`}
                     style={styles.voteButton}
                     onPress={() => void app.voteOnReport(selectedReport.id, true)}
                   />
@@ -453,6 +483,7 @@ export default function MapScreen(): React.ReactElement {
                     variant="outline"
                     icon="thumb-down-off-alt"
                     color={Colors.inkMuted}
+                    borderColor={`${Colors.inkMuted}66`}
                     style={styles.voteButton}
                     onPress={() => void app.voteOnReport(selectedReport.id, false)}
                   />
@@ -478,10 +509,15 @@ export default function MapScreen(): React.ReactElement {
               }}
             />
             <Button
-              label={s('reportInaccurate')}
+              label={
+                selectedReport.flagCount > 0
+                  ? `${s('reportInaccurate')} (${selectedReport.flagCount})`
+                  : s('reportInaccurate')
+              }
               variant="text"
-              icon="flag"
+              icon="outlined-flag"
               color={Colors.inkMuted}
+              disabled={!user || selectedReport.flaggedUserIds.includes(user.id)}
               onPress={() => {
                 void app.flagReport(selectedReport.id);
                 Alert.alert(s('flaggedForReview'));
@@ -522,25 +558,45 @@ export default function MapScreen(): React.ReactElement {
                 color={Colors.brandBlue}
                 icon="near-me"
               />
+              <Badge
+                label={`${formatDuration(
+                  Geo.walkingTimeSeconds(Geo.distanceMeters(userPoint, selectedSpot.location)),
+                  settings.language,
+                )} ${s('walk')}`}
+                color={Colors.brandBlue}
+                icon="directions-walk"
+              />
             </View>
-            <Text style={styles.description}>{selectedSpot.description}</Text>
-            <Button
-              label={s('getDirections')}
-              icon="directions"
-              style={styles.sheetAction}
-              onPress={() => {
-                const target = selectedSpot;
-                setSelectedSpotId(null);
-                router.push({
-                  pathname: '/directions',
-                  params: {
-                    lat: String(target.location.lat),
-                    lng: String(target.location.lng),
-                    label: target.name,
-                  },
-                });
-              }}
-            />
+            <Text style={styles.spotDescription} numberOfLines={3}>
+              {selectedSpot.description}
+            </Text>
+            <View style={styles.spotActions}>
+              <Button
+                label={spotSubscribed ? s('subscribed') : s('subscribe')}
+                variant="outline"
+                icon={spotSubscribed ? 'notifications-active' : 'notifications-none'}
+                color={spotSubscribed ? Colors.safeDark : Colors.brandBlue}
+                style={styles.spotAction}
+                onPress={() => void app.toggleSubscription(selectedSpot.id)}
+              />
+              <Button
+                label={s('directions')}
+                icon="directions"
+                style={styles.spotAction}
+                onPress={() => {
+                  const target = selectedSpot;
+                  setSelectedSpotId(null);
+                  router.push({
+                    pathname: '/directions',
+                    params: {
+                      lat: String(target.location.lat),
+                      lng: String(target.location.lng),
+                      label: target.name,
+                    },
+                  });
+                }}
+              />
+            </View>
           </View>
         )}
       </Sheet>
@@ -550,11 +606,15 @@ export default function MapScreen(): React.ReactElement {
         <Text style={styles.sheetTitle}>{s('filters')}</Text>
         <FilterRow
           label={s('showVerifiedOnly')}
+          icon="verified"
+          color={Colors.brandRed}
           value={!settings.layers.includes('pending_reports')}
           onToggle={(v) => void app.setVerifiedOnly(v)}
         />
         <FilterRow
           label={s('showSafeSpots')}
+          icon="shield"
+          color={Colors.safe}
           value={settings.layers.includes('safe_spots')}
           onToggle={() => void app.toggleLayer('safe_spots')}
         />
@@ -585,12 +645,33 @@ function MapButton({
   );
 }
 
+function MetaRow({
+  icon,
+  label,
+  color,
+}: {
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  label: string;
+  color?: string;
+}): React.ReactElement {
+  return (
+    <View style={styles.metaRow}>
+      <MaterialIcons name={icon} size={16} color={color ?? Colors.inkFaint} />
+      <Text style={[styles.metaText, { color: color ?? Colors.inkMuted }]}>{label}</Text>
+    </View>
+  );
+}
+
 function FilterRow({
   label,
+  icon,
+  color,
   value,
   onToggle,
 }: {
   label: string;
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  color: string;
   value: boolean;
   onToggle: (next: boolean) => void;
 }): React.ReactElement {
@@ -601,11 +682,15 @@ function FilterRow({
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
     >
+      <View style={[styles.filterIcon, { backgroundColor: `${color}1F` }]}>
+        <MaterialIcons name={icon} size={19} color={color} />
+      </View>
       <Text style={styles.filterLabel}>{label}</Text>
-      <MaterialIcons
-        name={value ? 'toggle-on' : 'toggle-off'}
-        size={34}
-        color={value ? Colors.safe : Colors.inkFaint}
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        trackColor={{ false: Colors.line, true: Colors.brandBlue }}
+        thumbColor={Colors.white}
       />
     </Pressable>
   );
@@ -613,7 +698,14 @@ function FilterRow({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surfaceAlt },
-  topOverlay: { position: 'absolute', top: 0, left: 0, right: 0, padding: Spacing.lg },
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: 10,
+  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -653,23 +745,26 @@ const styles = StyleSheet.create({
   suggestionBody: { flex: 1, marginLeft: Spacing.md },
   suggestionLabel: { fontSize: 15, fontWeight: '700', color: Colors.ink },
   suggestionSub: { fontSize: 12.5, color: Colors.inkMuted },
-  bannerWrap: { marginTop: Spacing.md },
+  bannerWrap: { marginTop: 10 },
   safetyBanner: { position: 'absolute', left: Spacing.lg, right: 76, bottom: 172 },
   bannerAction: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: Radius.pill,
+    minHeight: 40,
+    justifyContent: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: 6,
   },
-  bannerActionText: { color: Colors.white, fontWeight: '700', fontSize: 13 },
+  bannerActionText: { color: Colors.white, fontWeight: '700', fontSize: 15.5 },
   mapControls: { position: 'absolute', right: Spacing.lg, bottom: 104, alignItems: 'center' },
   mapButton: {
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
     ...Shadow.floating,
   },
+  mapControlGap: { height: 10 },
+  mapControlGapSmall: { height: 6 },
   bottomBar: {
     position: 'absolute',
     left: Spacing.lg,
@@ -714,7 +809,9 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.lg },
   photoBox: { marginTop: Spacing.lg, borderRadius: Radius.md, overflow: 'hidden' },
   description: { fontSize: 15, lineHeight: 22, color: Colors.ink, marginTop: Spacing.md },
-  meta: { fontSize: 12.5, color: Colors.inkMuted, marginTop: 6 },
+  metaRows: { marginTop: 14 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  metaText: { flex: 1, fontSize: 12.5, lineHeight: 17.5, marginLeft: Spacing.sm },
   votePanel: {
     backgroundColor: Colors.surfaceAlt,
     borderRadius: Radius.md,
@@ -723,18 +820,29 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     marginTop: Spacing.lg,
   },
-  voteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  voteTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
-  voteCount: { fontSize: 13, fontWeight: '700', color: Colors.safe },
-  voted: { color: Colors.safeDark, fontWeight: '600', marginTop: Spacing.md },
-  voteButtons: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  voteHeader: { flexDirection: 'row', alignItems: 'center' },
+  voteTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.ink },
+  voteCount: { fontSize: 15, fontWeight: '800', color: Colors.safe, marginLeft: 5 },
+  voteSummary: { fontSize: 12.5, lineHeight: 17.5, color: Colors.inkFaint, marginTop: Spacing.xs },
+  votedRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md },
+  voted: { flex: 1, fontSize: 14.5, color: Colors.safeDark, fontWeight: '600', marginLeft: Spacing.sm },
+  voteButtons: { flexDirection: 'row', gap: 10, marginTop: Spacing.md },
   voteButton: { flex: 1 },
   sheetAction: { marginTop: Spacing.lg },
+  spotDescription: { fontSize: 14.5, lineHeight: 21, color: Colors.inkMuted, marginTop: 14 },
+  spotActions: { flexDirection: 'row', gap: 10, marginTop: Spacing.lg },
+  spotAction: { flex: 1 },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
-  filterLabel: { fontSize: 16, fontWeight: '600', color: Colors.ink, flex: 1 },
+  filterIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterLabel: { fontSize: 16, fontWeight: '700', color: Colors.ink, flex: 1, marginLeft: Spacing.lg },
 });

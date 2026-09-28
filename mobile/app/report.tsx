@@ -1,17 +1,19 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BantayMap } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
-import { Button, StatusBanner } from '../src/components/ui';
+import { AppBar, Badge, Button, Card, StatusBanner } from '../src/components/ui';
 import { HazardPhoto } from '../src/components/ui/HazardPhoto';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { PlacementPin } from '../src/components/ui/Pins';
+import { StringKey } from '../src/core/i18n/strings';
 import { LatLng } from '../src/core/geo/latLng';
-import { Colors, Radius, Spacing } from '../src/core/theme/colors';
+import { Colors, Radius, Shadow, Spacing } from '../src/core/theme/colors';
 import {
   hazardIcon,
   hazardLabelKey,
@@ -26,12 +28,19 @@ import {
   HazardSeverity,
   HazardType,
 } from '../src/data/models/enums';
+import { HazardReport } from '../src/data/models/types';
 import { describePoint } from '../src/data/seed/gazetteer';
 import { useApp } from '../src/state/appStore';
 import { useUserLocation } from '../src/state/LocationProvider';
 
 const STEP_COUNT = 4;
 const MAX_DESCRIPTION = 140;
+
+const SEVERITY_DESC: Record<HazardSeverity, StringKey> = {
+  passable_with_caution: 'severityCautionDesc',
+  not_passable: 'severityBlockedDesc',
+  life_threatening: 'severityDangerDesc',
+};
 
 /**
  * The four-step guided hazard report.
@@ -50,22 +59,116 @@ export default function ReportScreen(): React.ReactElement {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState<HazardReport | null>(null);
 
   const controller = useMapController({ center: location.current, zoom: 17 });
   const addressLabel = describePoint(point);
+
+  const hasInput = type !== null || severity !== null || photoUri !== null;
+
+  /** Back a step, or leave - checking first if anything would be lost. */
+  const back = (): void => {
+    if (step > 0) {
+      setStep(step - 1);
+      return;
+    }
+    if (!hasInput) {
+      router.back();
+      return;
+    }
+    Alert.alert(s('cancel'), s('discardReport'), [
+      { text: s('back'), style: 'cancel' },
+      { text: s('confirm'), style: 'destructive', onPress: () => router.back() },
+    ]);
+  };
+
+  const backToMap = (report: HazardReport): void =>
+    router.replace({ pathname: '/(tabs)', params: { focusReport: report.id } });
+
+  // Android's back button steps back through the report the same way, and
+  // after submitting it returns to the map.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (submitted) backToMap(submitted);
+      else back();
+      return true;
+    });
+    return () => sub.remove();
+  });
+
+  if (submitted) {
+    return (
+      <SafeAreaView style={styles.success} edges={['top', 'bottom']}>
+        <View style={styles.successInner}>
+          <View style={styles.successIcon}>
+            <MaterialIcons name="check" size={58} color={Colors.safe} />
+          </View>
+          <Text style={styles.successTitle}>{s('reportSubmittedTitle')}</Text>
+          <Text style={styles.successBody}>{s('reportSubmittedBody')}</Text>
+          <Card style={styles.successCard}>
+            <View style={styles.successRow}>
+              <View style={styles.successPhoto}>
+                <HazardPhoto uri={submitted.photoUri} type={submitted.type} height={62} radius={10} />
+              </View>
+              <View style={styles.successDetails}>
+                <Text style={styles.successType}>{s(hazardLabelKey(submitted.type))}</Text>
+                <Text style={styles.successAddress}>{submitted.addressLabel}</Text>
+                <View style={styles.successBadge}>
+                  <Badge label={s('pendingBadge')} color={Colors.warning} icon="schedule" compact />
+                </View>
+              </View>
+            </View>
+          </Card>
+          <Button label={s('backToMap')} icon="map" onPress={() => backToMap(submitted)} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const header = (
+    <View style={styles.header}>
+      <AppBar
+        title={s('reportHazard')}
+        leading={step === 0 ? 'close' : 'back'}
+        onLeading={back}
+      />
+      <View style={styles.progress}>
+        <Text style={styles.stepLabel}>
+          {s('step')} {step + 1}/{STEP_COUNT}
+        </Text>
+        <View style={styles.bars}>
+          {Array.from({ length: STEP_COUNT }).map((_, i) => (
+            <Pressable
+              key={i}
+              // Tapping a completed step jumps back to it; later steps stay
+              // locked until the current one is done.
+              onPress={i < step ? () => setStep(i) : undefined}
+              style={[
+                styles.bar,
+                { backgroundColor: i <= step ? Colors.brandRed : Colors.line },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
 
   // The database refuses a suspended account's report; say so up front
   // rather than after four steps of filling it in.
   if (user?.status === 'suspended') {
     return (
-      <View style={styles.suspended}>
-        <StatusBanner
-          icon="block"
-          title={s('accountSuspendedTitle')}
-          message={s('accountSuspendedBody')}
-          color={Colors.brandRed}
-        />
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        {header}
+        <View style={styles.suspended}>
+          <StatusBanner
+            icon="block"
+            title={s('accountSuspendedTitle')}
+            message={s('accountSuspendedBody')}
+            color={Colors.brandRed}
+          />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -129,41 +232,12 @@ export default function ReportScreen(): React.ReactElement {
       setBusy(false);
     }
 
-    Alert.alert(s('reportSubmittedTitle'), s('reportSubmittedBody'), [
-      {
-        text: s('backToMap'),
-        onPress: () =>
-          router.replace({ pathname: '/(tabs)', params: { focusReport: report.id } }),
-      },
-    ]);
-  };
-
-  const back = (): void => {
-    if (step === 0) {
-      router.back();
-      return;
-    }
-    setStep(step - 1);
+    setSubmitted(report);
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.progress}>
-        <Text style={styles.stepLabel}>
-          {s('step')} {step + 1}/{STEP_COUNT}
-        </Text>
-        <View style={styles.bars}>
-          {Array.from({ length: STEP_COUNT }).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.bar,
-                { backgroundColor: i <= step ? Colors.brandRed : Colors.line },
-              ]}
-            />
-          ))}
-        </View>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {header}
 
       {step === 0 && (
         <View style={styles.flex}>
@@ -181,9 +255,17 @@ export default function ReportScreen(): React.ReactElement {
             <View style={styles.pinOverlay} pointerEvents="none">
               <PlacementPin />
             </View>
+            <Pressable
+              onPress={() => controller.moveTo(location.current, 17)}
+              style={styles.recentre}
+              accessibilityRole="button"
+              accessibilityLabel={s('recenter')}
+            >
+              <MaterialIcons name="my-location" size={21} color={Colors.brandBlue} />
+            </Pressable>
           </View>
           <View style={styles.addressBar}>
-            <MaterialIcons name="place" size={20} color={Colors.brandRed} />
+            <MaterialCommunityIcons name="map-marker-outline" size={20} color={Colors.brandRed} />
             <View style={styles.addressBody}>
               <Text style={styles.addressLabel}>{addressLabel}</Text>
               <Text style={styles.addressCoords}>
@@ -206,6 +288,7 @@ export default function ReportScreen(): React.ReactElement {
                 icon={hazardIcon(t)}
                 title={s(hazardLabelKey(t))}
                 color={Colors.brandRed}
+                selectedBackground={Colors.brandRedLight}
                 onPress={() => setType(t)}
               />
             ))}
@@ -226,7 +309,9 @@ export default function ReportScreen(): React.ReactElement {
                 selected={severity === sev}
                 icon={severityIcon(sev)}
                 title={s(severityLabelKey(sev))}
+                description={s(SEVERITY_DESC[sev])}
                 color={severityColor(sev)}
+                tinted
                 onPress={() => setSeverity(sev)}
               />
             ))}
@@ -242,14 +327,18 @@ export default function ReportScreen(): React.ReactElement {
           <View style={styles.photoFrame}>
             {photoUri ? (
               <>
-                <HazardPhoto uri={photoUri} type={type ?? 'other'} height={220} />
-                <Pressable style={styles.clearPhoto} onPress={() => setPhotoUri(null)} hitSlop={8}>
+                <HazardPhoto uri={photoUri} type={type ?? 'other'} height={230} />
+                <Pressable style={styles.clearPhoto} onPress={() => setPhotoUri(null)}>
                   <MaterialIcons name="close" size={19} color={Colors.white} />
                 </Pressable>
               </>
             ) : (
               <View style={styles.photoEmpty}>
-                <MaterialIcons name="add-a-photo" size={42} color={Colors.warningDark} />
+                {type ? (
+                  <MaterialIcons name={hazardIcon(type)} size={42} color={Colors.warningDark} />
+                ) : (
+                  <MaterialIcons name="add-a-photo" size={42} color={Colors.warningDark} />
+                )}
                 <Text style={styles.photoEmptyText}>{s('photoRequiredNotice')}</Text>
               </View>
             )}
@@ -273,14 +362,19 @@ export default function ReportScreen(): React.ReactElement {
           </View>
 
           <View style={styles.descriptionWrap}>
+            <Text style={styles.descriptionTitle}>{s('descriptionOptional')}</Text>
             <Field
-              label={`${s('descriptionOptional')} (${description.length}/${MAX_DESCRIPTION})`}
+              label={s('descriptionOptional')}
+              floatingLabel={false}
               value={description}
               onChangeText={setDescription}
               placeholder={s('descriptionHint')}
               maxLength={MAX_DESCRIPTION}
               multiline
             />
+            <Text style={styles.counter}>
+              {description.length}/{MAX_DESCRIPTION}
+            </Text>
           </View>
         </ScrollView>
       )}
@@ -293,13 +387,15 @@ export default function ReportScreen(): React.ReactElement {
           </View>
         )}
         <View style={styles.footerRow}>
-          <Button
-            label={s('back')}
-            variant="outline"
-            style={styles.backButton}
-            onPress={back}
-            disabled={busy}
-          />
+          {step > 0 && (
+            <Button
+              label={s('back')}
+              variant="outline"
+              style={styles.backButton}
+              onPress={back}
+              disabled={busy}
+            />
+          )}
           <Button
             label={step === STEP_COUNT - 1 ? s('submitReport') : s('next')}
             icon={step === STEP_COUNT - 1 ? 'send' : undefined}
@@ -310,7 +406,7 @@ export default function ReportScreen(): React.ReactElement {
           />
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -318,13 +414,20 @@ function OptionCard({
   selected,
   icon,
   title,
+  description,
   color,
+  selectedBackground,
+  tinted = false,
   onPress,
 }: {
   selected: boolean;
   icon: React.ComponentProps<typeof MaterialIcons>['name'];
   title: string;
+  description?: string;
   color: string;
+  selectedBackground?: string;
+  /** Show the colour even while unselected, as the severity scale does. */
+  tinted?: boolean;
   onPress: () => void;
 }): React.ReactElement {
   return (
@@ -334,19 +437,32 @@ function OptionCard({
       accessibilityState={{ selected }}
       style={[
         styles.option,
+        description ? styles.optionTall : null,
         {
-          backgroundColor: selected ? `${color}14` : Colors.surface,
+          backgroundColor: selected ? (selectedBackground ?? `${color}1A`) : Colors.surface,
           borderColor: selected ? color : Colors.line,
           borderWidth: selected ? 2 : 1,
         },
       ]}
     >
       <View
-        style={[styles.optionIcon, { backgroundColor: selected ? color : Colors.surfaceAlt }]}
+        style={[
+          styles.optionIcon,
+          {
+            backgroundColor: selected ? color : tinted ? `${color}1F` : Colors.surfaceAlt,
+          },
+        ]}
       >
-        <MaterialIcons name={icon} size={23} color={selected ? Colors.white : Colors.inkMuted} />
+        <MaterialIcons
+          name={icon}
+          size={23}
+          color={selected ? Colors.white : tinted ? color : Colors.inkMuted}
+        />
       </View>
-      <Text style={styles.optionTitle}>{title}</Text>
+      <View style={styles.optionBody}>
+        <Text style={styles.optionTitle}>{title}</Text>
+        {description && <Text style={styles.optionDesc}>{description}</Text>}
+      </View>
       <MaterialIcons
         name={selected ? 'check-circle' : 'radio-button-unchecked'}
         size={24}
@@ -358,19 +474,59 @@ function OptionCard({
 
 const styles = StyleSheet.create({
   suspended: { flex: 1, padding: Spacing.lg, backgroundColor: Colors.surfaceAlt },
-  container: { flex: 1, backgroundColor: Colors.surface },
+  success: { flex: 1, backgroundColor: Colors.surfaceAlt },
+  successInner: {
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 460,
+    alignSelf: 'center',
+    padding: 24,
+  },
+  successIcon: {
+    alignSelf: 'center',
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: Colors.safeLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    color: Colors.ink,
+    textAlign: 'center',
+    marginTop: Spacing.xxl,
+  },
+  successBody: {
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: Colors.inkMuted,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  successCard: { marginTop: 26, marginBottom: 24 },
+  successRow: { flexDirection: 'row', alignItems: 'center' },
+  successPhoto: { width: 62, height: 62, borderRadius: 10, overflow: 'hidden' },
+  successDetails: { flex: 1, marginLeft: 14 },
+  successType: { fontSize: 16, fontWeight: '700', color: Colors.ink },
+  successAddress: { fontSize: 12.5, lineHeight: 17.5, color: Colors.inkFaint, marginTop: 2 },
+  successBadge: { flexDirection: 'row', marginTop: Spacing.sm },
+  container: { flex: 1, backgroundColor: Colors.surfaceAlt },
+  header: { backgroundColor: Colors.surface },
   flex: { flex: 1 },
   progress: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
   },
   stepLabel: { fontSize: 12, fontWeight: '700', color: Colors.inkMuted },
   bars: { flexDirection: 'row', gap: 5, marginTop: Spacing.sm },
   bar: { flex: 1, height: 5, borderRadius: 3 },
-  intro: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md },
-  scroll: { padding: Spacing.xl, paddingBottom: Spacing.xxl },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.ink },
+  intro: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, paddingBottom: Spacing.md },
+  scroll: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, paddingBottom: 24 },
+  title: { fontSize: 22, fontWeight: '700', color: Colors.ink, letterSpacing: -0.3 },
   body: { fontSize: 14.5, color: Colors.inkMuted, marginTop: 6, lineHeight: 21 },
   mapWrap: { flex: 1, overflow: 'hidden' },
   pinOverlay: {
@@ -380,24 +536,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 52,
   },
+  recentre: {
+    position: 'absolute',
+    right: 14,
+    bottom: 14,
+    width: 44,
+    height: 44,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.card,
+  },
   addressBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: 14,
     backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.line,
   },
-  addressBody: { flex: 1, marginLeft: Spacing.md },
+  addressBody: { flex: 1, marginLeft: 10 },
   addressLabel: { fontSize: 16, fontWeight: '700', color: Colors.ink },
-  addressCoords: { fontSize: 12, color: Colors.inkMuted, marginTop: 2 },
-  options: { marginTop: Spacing.xl, gap: Spacing.md },
+  addressCoords: { fontSize: 12.5, color: Colors.inkFaint, marginTop: 2 },
+  options: { marginTop: Spacing.xl, gap: 10 },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Radius.md,
-    padding: Spacing.lg,
+    padding: 14,
   },
+  optionTall: { alignItems: 'flex-start', padding: Spacing.lg },
+  optionBody: { flex: 1, marginLeft: 14, marginRight: Spacing.sm },
+  optionDesc: { fontSize: 12.5, lineHeight: 17.5, color: Colors.inkFaint, marginTop: Spacing.xs },
   optionIcon: {
     width: 46,
     height: 46,
@@ -405,9 +575,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.ink, marginHorizontal: Spacing.md },
+  optionTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
   photoFrame: {
-    marginTop: Spacing.lg,
+    marginTop: 18,
     borderRadius: Radius.md,
     overflow: 'hidden',
     minHeight: 176,
@@ -421,28 +591,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoEmptyText: { color: Colors.warningDark, fontWeight: '600', marginTop: Spacing.sm },
+  photoEmptyText: { color: Colors.warningDark, fontWeight: '600', marginTop: 10 },
   clearPhoto: {
     position: 'absolute',
     right: 10,
     top: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoButtons: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg },
+  photoButtons: { flexDirection: 'row', gap: 10, marginTop: 14 },
   photoButton: { flex: 1 },
-  descriptionWrap: { marginTop: Spacing.xl },
+  descriptionWrap: { marginTop: 24 },
+  descriptionTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink, marginBottom: Spacing.sm },
+  counter: { fontSize: 12, color: Colors.inkFaint, textAlign: 'right', marginTop: -8 },
   footer: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.line,
     backgroundColor: Colors.surface,
   },
-  notice: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md },
+  notice: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   noticeText: {
     fontSize: 12.5,
     color: Colors.warningDark,
