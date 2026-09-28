@@ -171,8 +171,8 @@ No screen imports storage directly.
 
 ## Design
 
-Red `#FF3131` and blue `#004AAD` come from the logo — a blue eye with a red
-map pin in its iris. Orange `#F4772E` and green `#2E9E44` are reserved
+Deep red `#C8102E` and blue `#1B4FA0` come from the logo — a blue eye with a
+red map-pin pupil. Orange `#F4772E` and green `#2E9E44` are reserved
 exclusively for hazard state, so a glance at the map is never ambiguous. Tap
 targets are at least 48dp, because this app gets used one-handed, outdoors, in
 the rain, in a hurry.

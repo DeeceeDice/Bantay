@@ -155,5 +155,5 @@ const styles = StyleSheet.create({
   fieldIcon: { marginRight: Spacing.sm },
   input: { flex: 1, fontSize: 16, color: Colors.ink, paddingVertical: Spacing.md },
   inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
-  errorText: { fontSize: 12.5, color: Colors.brandRedDark, marginTop: 5, fontWeight: '600' },
+  errorText: { fontSize: 12.5, color: Colors.brandRed, marginTop: 5, fontWeight: '600' },
 });

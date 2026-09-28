@@ -1,22 +1,21 @@
 /**
  * Bantay brand palette.
  *
- * The logo is a blue eye with a red map pin in its iris, so red and blue carry
+ * The logo is a blue eye with a red map-pin pupil, so deep red and blue carry
  * the brand while orange and green are reserved exclusively for hazard state
  * (pending vs. verified-safe). Nothing else in the UI may use the state
  * colours, so a glance at the map is unambiguous.
  */
 export const Colors = {
-  /** Primary brand red, the logo's map pin. */
-  brandRed: '#FF3131',
-  /** Deeper red for small text on white, where the logo red is too light. */
-  brandRedDark: '#C8102E',
-  brandRedLight: '#FFE0E0',
+  /** Primary brand red, from the map-pin pupil in the logo. */
+  brandRed: '#C8102E',
+  brandRedDark: '#9B0C23',
+  brandRedLight: '#F7DDE2',
 
-  /** Secondary brand blue, the logo's eye. */
-  brandBlue: '#004AAD',
-  brandBlueDark: '#003479',
-  brandBlueLight: '#DEE7F4',
+  /** Secondary brand blue, from the eye shape in the logo. */
+  brandBlue: '#1B4FA0',
+  brandBlueDark: '#123772',
+  brandBlueLight: '#DFE8F5',
 
   /** Pending / unverified / caution state. */
   warning: '#F4772E',
