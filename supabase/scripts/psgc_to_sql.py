@@ -62,7 +62,7 @@ def build(rows):
 
     def name(code):
         row = by_code.get(code)
-        return row["area_name"] if row else ""
+        return " ".join(row["area_name"].split()) if row else ""
 
     def level(code):
         row = by_code.get(code)
@@ -97,7 +97,7 @@ def build(rows):
 
         out.append({
             "code": code,
-            "name": r["area_name"].strip(),
+            "name": " ".join(r["area_name"].split()),
             "level": lvl or "",
             "region_code": region,
             "parent_code": parent,

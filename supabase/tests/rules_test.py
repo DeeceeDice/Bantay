@@ -226,7 +226,8 @@ admin("""insert into psgc_areas (code, name, level, region_code, parent_code, ci
   ('1381300022', 'Commonwealth', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 215035, 'Q2_2026'),
   ('0804816010', 'Commonwealth', 'Bgy', '0800000000', '0804816000', 'Tarangnan', 'Samar', 900, 'Q2_2026'),
   ('1381300050', 'Pasong Tamo', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 120000, 'Q2_2026'),
-  ('1381300060', 'Sauyo', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 90000, 'Q2_2026');""")
+  ('1381300060', 'Sauyo', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 90000, 'Q2_2026'),
+  ('1381300070', 'Santo Niño', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 5000, 'Q2_2026');""")
 T = signup("tess@example.com", "Tess")      # official for a barangay that already has a zone
 U = signup("uly@example.com", "Uly")        # official for a barangay with no zone and no map centre
 V = signup("vic@example.com", "Vic")        # official for a barangay with no zone yet
@@ -234,7 +235,7 @@ V = signup("vic@example.com", "Vic")        # official for a barangay with no zo
 check("seeded zones carry their PSGC codes",
       admin("select psgc_code from zones where id = 'commonwealth'") == "1381300022"
       and admin("select psgc_code from zones where id = 'sampaloc'") == "1380606000")
-expect_ok("anyone, signed in or not, can read PSGC", "select count(*) from psgc_areas where level = 'Bgy';", None, "4")
+expect_ok("anyone, signed in or not, can read PSGC", "select count(*) from psgc_areas where level = 'Bgy';", None, "5")
 expect_error("nobody but the loader writes PSGC",
              "insert into psgc_areas (code, name, region_code, version) values ('0000000001','Fake','0000000000','x');",
              S, "permission denied")
@@ -243,6 +244,7 @@ expect_ok("barangay search needs every word to match",
           "1381300022:Quezon City")
 expect_ok("...and puts the most populous first",
           "select string_agg(code, ',') from search_barangays('commonwealth');", None, "1381300022,0804816010")
+expect_ok("...and ignores accents", "select string_agg(name, ',') from search_barangays('santo nino');", None, "Santo Niño")
 expect_ok("...and ignores a one-letter query", "select count(*) from search_barangays('c');", None, "0")
 expect_error("a request cannot name a barangay that is not in PSGC",
              f"insert into access_requests (user_id, role, organization, psgc_code) values ('{T}', 'barangay_official', 'Brgy', '1399999999');",

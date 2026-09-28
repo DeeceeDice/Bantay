@@ -74,7 +74,7 @@ is empty.
    repository root, copy **all** of it, paste it in.
 4. Click **Run** (or Ctrl/Cmd + Enter).
 5. Do the same with `supabase/migrations/20260927000000_admin_console.sql`,
-   then `supabase/migrations/20260928120000_psgc.sql`. Order matters: each
+   then `20260928120000_psgc.sql` and `20260928130000_psgc_search_accents.sql`. Order matters: each
    builds on the one before.
 
 You should see `Success. No rows returned` each time.
