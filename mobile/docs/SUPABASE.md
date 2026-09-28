@@ -25,6 +25,9 @@ supabase/
   config.toml                                   marks this a Supabase project
   migrations/
     20260923120000_bantay_initial_schema.sql    tables, RLS, trigger, realtime
+    20260927000000_admin_console.sql            what Bantay Admin shares
+    20260928120000_psgc.sql                     the PSGC barangay list
+  scripts/psgc_to_sql.py                        loads PSGC from the PSA API
   seed.sql                                      sample spots and hazards
 ```
 
@@ -70,8 +73,9 @@ is empty.
 3. Open `supabase/migrations/20260923120000_bantay_initial_schema.sql` from the
    repository root, copy **all** of it, paste it in.
 4. Click **Run** (or Ctrl/Cmd + Enter).
-5. Do the same with `supabase/migrations/20260927000000_admin_console.sql`.
-   Order matters: the second builds on the first.
+5. Do the same with `supabase/migrations/20260927000000_admin_console.sql`,
+   then `supabase/migrations/20260928120000_psgc.sql`. Order matters: each
+   builds on the one before.
 
 You should see `Success. No rows returned` each time.
 
@@ -94,6 +98,22 @@ one adds and why.
 
 Check it worked: **Table Editor** → `safe_spots` should show 8 rows, and
 `reports` should show 5.
+
+### Load the barangay list (PSGC)
+
+Barangay officials pick their barangay from the PSA's Philippine Standard
+Geographic Code. The migration makes the table; the rows come from the PSA
+API with your token, which stays on your machine:
+
+```bash
+PSGC_TOKEN=your-psa-token python3 supabase/scripts/psgc_to_sql.py > psgc.sql
+psql "$DATABASE_URL" -f psgc.sql
+```
+
+`DATABASE_URL` is under **Project Settings → Database → Connection string**.
+(`psgc.sql` is about 6 MB; the SQL Editor may refuse a paste that large, so
+use `psql`.) Re-run it for a new PSGC release: it updates in place.
+**Table Editor** → `psgc_areas` should show 43,768 rows.
 
 ---
 

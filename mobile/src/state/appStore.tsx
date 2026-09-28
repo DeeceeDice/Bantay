@@ -13,6 +13,7 @@ import { Language, Translate, translator } from '../core/i18n/strings';
 import { MapLayer, RejectReason, SelfServiceRole } from '../data/models/enums';
 import {
   AlertItem,
+  Barangay,
   HazardReport,
   SafeSpot,
   SavedRoute,
@@ -78,6 +79,7 @@ export interface AppActions {
    * the role of this same account.
    */
   requestAccess(input: AccessRequestInput): Promise<void>;
+  searchBarangays(query: string): Promise<Barangay[]>;
   /** The area whose broadcasts and verified-hazard alerts you receive. */
   setHomeZone(zoneId: string | null): Promise<void>;
   logOut(): Promise<void>;
@@ -282,6 +284,11 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       await reloadForUser();
     },
     [backend, user, reloadForUser],
+  );
+
+  const searchBarangays: AppActions['searchBarangays'] = useCallback(
+    (query) => backend.searchBarangays(query),
+    [backend],
   );
 
   const setHomeZone: AppActions['setHomeZone'] = useCallback(
@@ -560,6 +567,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       logIn,
       selectRole,
       requestAccess,
+      searchBarangays,
       setHomeZone,
       logOut,
       submitReport,
@@ -579,7 +587,8 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       refresh: reload,
     }),
     [
-      ready, user, data, settings, signUp, logIn, selectRole, requestAccess, setHomeZone, logOut,
+      ready, user, data, settings, signUp, logIn, selectRole, requestAccess, searchBarangays,
+      setHomeZone, logOut,
       submitReport, voteOnReport, flagReport, verifyReport, rejectReport,
       addRoute, deleteRoute, restoreRoute, markAlertRead, markAllAlertsRead,
       toggleSubscription, updateSettings, toggleLayer, setVerifiedOnly, reload,

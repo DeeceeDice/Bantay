@@ -98,7 +98,9 @@ export default function ProfileScreen(): React.ReactElement {
               message={
                 latestRequest.status === 'pending'
                   ? `${s(roleLabelKey(latestRequest.role))} - ${
-                      data.zones.find((z) => z.id === latestRequest.zoneId)?.name ?? ''
+                      data.zones.find((z) => z.id === latestRequest.zoneId)?.name ??
+                      latestRequest.barangay?.name ??
+                      ''
                     }`
                   : latestRequest.decisionNote ?? undefined
               }

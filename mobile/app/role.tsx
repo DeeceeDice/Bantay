@@ -1,7 +1,15 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBar, Badge, Button, StatusBanner } from '../src/components/ui';
@@ -14,7 +22,9 @@ import {
   SelfServiceRole,
   isSelfServiceRole,
 } from '../src/data/models/enums';
+import { Barangay } from '../src/data/models/types';
 import { useApp } from '../src/state/appStore';
+import { useBarangayCentre, useBarangaySearch } from '../src/state/useBarangaySearch';
 
 type Choice = SelfServiceRole | OfficialRole;
 const CHOICES: readonly Choice[] = ['commuter', 'barangay_official', 'school_admin', 'business_owner'];
@@ -43,11 +53,19 @@ function RoleIcon({ role, color }: { role: Choice; color: string }): React.React
  * in Bantay Admin, and approval changes the role of this same account. The
  * database refuses a self-granted official role, so there is no shortcut to
  * offer here even by mistake.
+ *
+ * A barangay official names their barangay from the PSA's official list
+ * (PSGC) - any of the country's 42,000 - and Google Places finds it on the
+ * map. If Bantay has no zone there yet, approval creates one.
  */
 export default function RoleScreen(): React.ReactElement {
   const { s, user, data, selectRole, requestAccess } = useApp();
   const [selected, setSelected] = useState<Choice | null>(null);
   const [zoneId, setZoneId] = useState<string | null>(null);
+  const [barangayQuery, setBarangayQuery] = useState('');
+  const [barangay, setBarangay] = useState<Barangay | null>(null);
+  const search = useBarangaySearch(barangay ? '' : barangayQuery);
+  const located = useBarangayCentre(barangay);
   const [organization, setOrganization] = useState('');
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<Record<string, string | null>>({});
@@ -58,6 +76,10 @@ export default function RoleScreen(): React.ReactElement {
   const managedRole = user !== null && !isSelfServiceRole(user.role);
   const zoneName = (id: string | null): string =>
     data.zones.find((z) => z.id === id)?.name ?? '';
+  const requestPlace = (r: { zoneId: string | null; barangay: Barangay | null }): string =>
+    zoneName(r.zoneId) || (r.barangay ? `${r.barangay.name}, ${r.barangay.city}` : '');
+  const byPsgc = selected === 'barangay_official';
+  const existingZone = barangay ? data.zones.find((z) => z.psgcCode === barangay.code) ?? null : null;
   // Opened from Profile, as opposed to straight after sign-up.
   const changing = router.canGoBack();
 
@@ -90,15 +112,23 @@ export default function RoleScreen(): React.ReactElement {
     }
 
     const next = {
-      zone: zoneId ? null : s('zoneRequired'),
+      zone: (byPsgc ? barangay : zoneId) ? null : s(byPsgc ? 'barangayRequired' : 'zoneRequired'),
       organization: organization.trim().length >= 2 ? null : s('organizationRequired'),
     };
     setErrors(next);
-    if (next.zone || next.organization || !zoneId) return;
+    if (next.zone || next.organization) return;
+    // Wait for the map lookup so the centre goes with the request.
+    if (byPsgc && !existingZone && located.locating) return;
 
     setBusy(true);
     try {
-      await requestAccess({ role: selected, zoneId, organization, reason });
+      await requestAccess({
+        role: selected,
+        zoneId: byPsgc ? (existingZone?.id ?? null) : zoneId,
+        psgc: byPsgc && barangay ? { code: barangay.code, center: located.center } : undefined,
+        organization,
+        reason,
+      });
     } catch (e) {
       Alert.alert(s('somethingWentWrong'), e instanceof Error ? e.message : undefined);
       return;
@@ -131,7 +161,7 @@ export default function RoleScreen(): React.ReactElement {
             <StatusBanner
               icon="hourglass-top"
               title={s('requestPending')}
-              message={`${s(roleLabelKey(pending.role))} - ${zoneName(pending.zoneId)}`}
+              message={`${s(roleLabelKey(pending.role))} - ${requestPlace(pending)}`}
               color={Colors.warning}
             />
           </View>
@@ -160,6 +190,8 @@ export default function RoleScreen(): React.ReactElement {
                     if (blocked) return;
                     setSelected(role);
                     setZoneId(null);
+                    setBarangay(null);
+                    setBarangayQuery('');
                     setErrors({});
                   }}
                   disabled={blocked}
@@ -207,25 +239,103 @@ export default function RoleScreen(): React.ReactElement {
             <Text style={styles.requestTitle}>{s('requestAccessTitle')}</Text>
             <Text style={styles.requestSub}>{s('requestAccessSub')}</Text>
 
-            <Text style={styles.fieldLabel}>{s('chooseZone')}</Text>
-            <View style={styles.zones}>
-              {zonesForRole.map((z) => {
-                const on = zoneId === z.id;
-                return (
-                  <Pressable
-                    key={z.id}
-                    onPress={() => setZoneId(z.id)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                    style={[styles.zone, on && styles.zoneOn]}
-                  >
-                    <Text style={[styles.zoneName, on && styles.zoneNameOn]}>{z.name}</Text>
-                    <Text style={[styles.zoneCity, on && styles.zoneNameOn]}>{z.city}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {errors.zone && <Text style={styles.error}>{errors.zone}</Text>}
+            {byPsgc ? (
+              <>
+                <Text style={styles.fieldLabel}>{s('yourBarangay')}</Text>
+                {barangay ? (
+                  <View style={styles.picked}>
+                    <MaterialIcons name="location-city" size={22} color={Colors.brandBlue} />
+                    <View style={styles.pickedBody}>
+                      <Text style={styles.pickedName}>{barangay.name}</Text>
+                      <Text style={styles.pickedSub}>
+                        {barangay.city}, {barangay.province}
+                      </Text>
+                      <Text style={styles.pickedNote}>
+                        {existingZone
+                          ? s('barangayHasZone')
+                          : located.locating
+                            ? s('barangayLocating')
+                            : located.center
+                              ? `${s('barangayFoundAt')} ${located.address ?? ''}`
+                              : s('barangayNotLocated')}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        setBarangay(null);
+                        setBarangayQuery('');
+                      }}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={s('change')}
+                    >
+                      <Text style={styles.change}>{s('change')}</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <>
+                    <Field
+                      label={s('barangaySearchHint')}
+                      value={barangayQuery}
+                      onChangeText={setBarangayQuery}
+                      icon="search"
+                      autoComplete="off"
+                      error={errors.zone}
+                      maxLength={80}
+                    />
+                    {search.searching && <ActivityIndicator color={Colors.brandBlue} />}
+                    {search.error && <Text style={styles.error}>{search.error}</Text>}
+                    {!search.searching &&
+                      !search.error &&
+                      barangayQuery.trim().length >= 2 &&
+                      search.results.length === 0 && (
+                        <Text style={styles.hint}>{s('noBarangayFound')}</Text>
+                      )}
+                    {search.results.map((b) => (
+                      <Pressable
+                        key={b.code}
+                        onPress={() => {
+                          setBarangay(b);
+                          setErrors((e) => ({ ...e, zone: null }));
+                        }}
+                        accessibilityRole="button"
+                        style={styles.result}
+                      >
+                        <Text style={styles.resultName}>{b.name}</Text>
+                        <Text style={styles.resultSub}>
+                          {b.city}, {b.province}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {barangayQuery.length === 0 && (
+                      <Text style={styles.hint}>{s('psgcSource')}</Text>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+              <Text style={styles.fieldLabel}>{s('chooseZone')}</Text>
+              <View style={styles.zones}>
+                {zonesForRole.map((z) => {
+                  const on = zoneId === z.id;
+                  return (
+                    <Pressable
+                      key={z.id}
+                      onPress={() => setZoneId(z.id)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      style={[styles.zone, on && styles.zoneOn]}
+                    >
+                      <Text style={[styles.zoneName, on && styles.zoneNameOn]}>{z.name}</Text>
+                      <Text style={[styles.zoneCity, on && styles.zoneNameOn]}>{z.city}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {errors.zone && <Text style={styles.error}>{errors.zone}</Text>}
+              </>
+            )}
 
             <Field
               label={s('organization')}
@@ -261,7 +371,7 @@ export default function RoleScreen(): React.ReactElement {
                     : s('next')
               }
               onPress={advance}
-              disabled={!selected}
+              disabled={!selected || (byPsgc && !existingZone && located.locating)}
               loading={busy}
             />
             {pending && (
@@ -330,6 +440,32 @@ const styles = StyleSheet.create({
   zoneCity: { fontSize: 11.5, color: Colors.inkMuted, marginTop: 1 },
   zoneNameOn: { color: Colors.white },
   error: { fontSize: 12.5, color: Colors.brandRed, marginTop: 5, fontWeight: '600' },
+  hint: { fontSize: 12.5, color: Colors.inkMuted, marginBottom: Spacing.md, lineHeight: 18 },
+  result: {
+    borderWidth: 1,
+    borderColor: Colors.line,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  resultName: { fontSize: 14.5, fontWeight: '700', color: Colors.ink },
+  resultSub: { fontSize: 12, color: Colors.inkMuted, marginTop: 1 },
+  picked: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 2,
+    borderColor: Colors.brandBlue,
+    backgroundColor: Colors.brandBlueLight,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  pickedBody: { flex: 1, marginHorizontal: Spacing.md },
+  pickedName: { fontSize: 15.5, fontWeight: '800', color: Colors.ink },
+  pickedSub: { fontSize: 12.5, color: Colors.inkMuted, marginTop: 2 },
+  pickedNote: { fontSize: 12, color: Colors.brandBlueDark, marginTop: Spacing.sm, lineHeight: 17 },
+  change: { fontSize: 13.5, fontWeight: '700', color: Colors.brandBlue },
   footer: { paddingHorizontal: 24, paddingTop: Spacing.sm, paddingBottom: 24 },
   secondary: { marginTop: Spacing.md },
 });

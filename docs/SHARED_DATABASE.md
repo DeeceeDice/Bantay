@@ -48,10 +48,13 @@ the database itself can.
    password only they know.
 2. In Bantay, **Profile -> Change role -> Barangay Official / School Admin**,
    they pick the area they will cover and their office. That inserts a row in
-   `access_requests`.
+   `access_requests`. A barangay official searches the PSA's list of every
+   barangay (PSGC, see below) and picks theirs; a school admin picks a school
+   zone.
 3. A super admin approves it in the console with
    `decide_access_request(request_id, true, zone)`. The same account becomes
-   an official for that zone, and gets an alert saying so.
+   an official for that zone, and gets an alert saying so. For a barangay
+   request `zone` can be left null: see *Barangays from PSGC*.
 4. They sign in to Bantay Admin with the email and password they already have.
 
 This replaces the console's mock "approve generates a temporary password" and
@@ -139,6 +142,32 @@ The console's `active` is the database's `active`; `is_open_now` is a separate
 (`commonwealth`, `batasan`, `holyspirit`, `tatalon`, `malanday`, `ust`,
 `bhnhs`) plus `sampaloc`, which covers Bantay's own sample data. Each is a
 centre and a radius; the console's polygons can be drawn from them.
+
+**Barangays from PSGC:** `psgc_areas` holds the Philippine Standard
+Geographic Code (Q2 2026) from the Philippine Statistics Authority: all
+18 regions, 82 provinces, 1,642 cities and municipalities, 14 Manila
+sub-municipalities and 42,010 barangays, keyed by the PSA's 10-digit code.
+Anyone may read it; only the loader writes it
+(`supabase/scripts/psgc_to_sql.py`, which needs your PSA token in
+`PSGC_TOKEN`; the token is not in either app or in git).
+
+- `rpc('search_barangays', { q, max_results })` finds barangays whose name,
+  city or province contain every word of `q`, most populous first.
+- `zones.psgc_code` names the barangay a zone stands for. The six seeded
+  barangay zones carry theirs (Commonwealth `1381300022`, Sampaloc
+  `1380606000`, ...).
+- An access request may carry `psgc_code` plus `center_lat` / `center_lng`,
+  the centre Bantay found for it with Google Places. If a zone already
+  stands for that barangay, the request is filed against it (`zone_id` is
+  set on insert). If not, `decide_access_request(id, true)` with no `zone`
+  creates one - id `psgc-<code>`, named `Brgy. <name>`, a 900 m radius
+  around the filed centre - and makes the requester its official. With no
+  centre on file, approval asks the console for a zone, as before.
+- The approval's audit entry keeps `user`, `role` and `zone` and adds
+  `psgc` and `zone_created`.
+
+The console can show a request's barangay by embedding it:
+`select('*, psgc:psgc_areas(code, name, city, province)')`.
 
 **Broadcast types:** identical - `advisory`, `typhoon`, `evacuation`,
 `allclear`. A `typhoon` broadcast arrives in Bantay as a typhoon warning,

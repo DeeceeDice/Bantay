@@ -220,5 +220,51 @@ expect_error("super admin cannot make a school admin with a barangay zone",
 expect_ok("super admin makes a school admin for UST", f"select admin_set_user_role('{B}', 'school_admin', 'ust');", S)
 expect_error("super admin cannot demote themselves", f"select admin_set_user_role('{S}', 'commuter');", S, "your own role")
 
+# --- PSGC: official barangays for access requests ---------------------------------
+admin("""insert into psgc_areas (code, name, level, region_code, parent_code, city, province, population_2024, version) values
+  ('1381300000', 'Quezon City', 'City', '1300000000', '1300000000', '', 'National Capital Region (NCR)', 3084270, 'Q2_2026'),
+  ('1381300022', 'Commonwealth', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 215035, 'Q2_2026'),
+  ('0804816010', 'Commonwealth', 'Bgy', '0800000000', '0804816000', 'Tarangnan', 'Samar', 900, 'Q2_2026'),
+  ('1381300050', 'Pasong Tamo', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 120000, 'Q2_2026'),
+  ('1381300060', 'Sauyo', 'Bgy', '1300000000', '1381300000', 'Quezon City', 'National Capital Region (NCR)', 90000, 'Q2_2026');""")
+T = signup("tess@example.com", "Tess")      # official for a barangay that already has a zone
+U = signup("uly@example.com", "Uly")        # official for a barangay with no zone and no map centre
+V = signup("vic@example.com", "Vic")        # official for a barangay with no zone yet
+
+check("seeded zones carry their PSGC codes",
+      admin("select psgc_code from zones where id = 'commonwealth'") == "1381300022"
+      and admin("select psgc_code from zones where id = 'sampaloc'") == "1380606000")
+expect_ok("anyone, signed in or not, can read PSGC", "select count(*) from psgc_areas where level = 'Bgy';", None, "4")
+expect_error("nobody but the loader writes PSGC",
+             "insert into psgc_areas (code, name, region_code, version) values ('0000000001','Fake','0000000000','x');",
+             S, "permission denied")
+expect_ok("barangay search needs every word to match",
+          "select string_agg(code || ':' || city, ',') from search_barangays('commonwealth quezon');", None,
+          "1381300022:Quezon City")
+expect_ok("...and puts the most populous first",
+          "select string_agg(code, ',') from search_barangays('commonwealth');", None, "1381300022,0804816010")
+expect_ok("...and ignores a one-letter query", "select count(*) from search_barangays('c');", None, "0")
+expect_error("a request cannot name a barangay that is not in PSGC",
+             f"insert into access_requests (user_id, role, organization, psgc_code) values ('{T}', 'barangay_official', 'Brgy', '1399999999');",
+             T, "foreign key")
+TREQ = expect_ok("a request for a barangay with a zone is filed against that zone",
+                 f"insert into access_requests (user_id, role, organization, psgc_code) values ('{T}', 'barangay_official', 'Brgy. Commonwealth Council', '1381300022') returning id;", T)
+check("...zone linked automatically", admin(f"select zone_id from access_requests where id = '{TREQ}'") == "commonwealth")
+UREQ = expect_ok("a request for a barangay with no zone and no centre is accepted",
+                 f"insert into access_requests (user_id, role, organization, psgc_code) values ('{U}', 'barangay_official', 'Brgy. Sauyo Council', '1381300060') returning id;", U)
+expect_error("...but cannot be approved without a zone",
+             f"select decide_access_request('{UREQ}', true);", S, "no map centre")
+VREQ = expect_ok("a request for a barangay with no zone carries the centre the app found",
+                 f"insert into access_requests (user_id, role, organization, psgc_code, center_lat, center_lng) values ('{V}', 'barangay_official', 'Brgy. Pasong Tamo Council', '1381300050', 14.6760, 121.0470) returning id;", V)
+expect_ok("super admin approves it", f"select decide_access_request('{VREQ}', true);", S)
+row = admin("select name || '|' || kind || '|' || city || '|' || center_lat || '|' || psgc_code from zones where id = 'psgc-1381300050'")
+check("...which creates the zone from PSGC", row == "Brgy. Pasong Tamo|barangay|Quezon City|14.676|1381300050", row)
+row = admin(f"select role || '|' || zone_id || '|' || barangay from profiles where id = '{V}'")
+check("...and makes them its official", row == "barangay_official|psgc-1381300050|Brgy. Pasong Tamo", row)
+row = admin("select meta->>'psgc' || '|' || (meta->>'zone_created') from audit_log where action = 'access_approved' order by id desc limit 1")
+check("...and the audit entry says the zone was created", row == "1381300050|true", row)
+expect_ok("approving a barangay with a zone reuses it", f"select decide_access_request('{TREQ}', true);", S)
+check("...no second zone", admin("select count(*) from zones where psgc_code = '1381300022'") == "1")
+
 print(f"\n{sum(results)}/{len(results)} passed")
 sys.exit(0 if all(results) else 1)

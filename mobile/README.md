@@ -36,7 +36,10 @@ machine at another one with `.env`, see
 database and the same accounts. Officials are not a role you pick: choosing
 Barangay Official or School Admin files an access request that a super admin
 approves, and the database - not either app - decides who may review, manage
-safe spots or broadcast, and in which zone. What the two apps share, and how
+safe spots or broadcast, and in which zone. A barangay official names their
+barangay from the PSA's official list (PSGC, all 42,010 barangays, loaded into
+the database); if Bantay has no zone there yet, approval creates one where
+Google Places finds it. What the two apps share, and how
 the console's vocabulary maps onto it, is in
 **[docs/SHARED_DATABASE.md](../docs/SHARED_DATABASE.md)**.
 
@@ -157,7 +160,7 @@ src/
   state/                App store, location provider
 scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
-__tests__/              104 tests
+__tests__/              109 tests
 ```
 
 The SQL is not in here. It lives in `supabase/` at the **repository root**,
@@ -168,6 +171,7 @@ owns:
 supabase/config.toml    marks the repo as a Supabase project
 supabase/migrations/    tables, RLS policies, trigger, realtime
 supabase/seed.sql       sample spots and hazards
+supabase/scripts/       psgc_to_sql.py, loads the PSGC barangay list
 ```
 
 ---
@@ -177,7 +181,7 @@ supabase/seed.sql       sample spots and hazards
 ```bash
 npm run typecheck        # tsc, strict
 npm run lint             # eslint, including the React Compiler rules
-npm test                 # 104 tests
+npm test                 # 109 tests
 npm run check:supabase   # verifies the database connection, schema and RLS
 ```
 

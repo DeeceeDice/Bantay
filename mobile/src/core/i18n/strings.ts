@@ -355,6 +355,28 @@ const COPY = {
   ],
   chooseZone: ['Area you will cover', 'Lugar na sasakupin mo'],
   zoneRequired: ['Choose the area you will cover.', 'Piliin ang lugar na sasakupin mo.'],
+  change: ['Change', 'Palitan'],
+  yourBarangay: ['Your barangay', 'Ang iyong barangay'],
+  barangaySearchHint: ['Search barangay, city or province', 'Hanapin ang barangay, lungsod o probinsya'],
+  barangayRequired: ['Choose the barangay you serve.', 'Piliin ang barangay na pinagsisilbihan mo.'],
+  noBarangayFound: ['No barangay matches that.', 'Walang barangay na tugma.'],
+  psgcSource: [
+    'From the PSA list of every barangay in the country (PSGC). Try "Commonwealth Quezon".',
+    'Mula sa listahan ng PSA ng lahat ng barangay sa bansa (PSGC). Subukan ang "Commonwealth Quezon".',
+  ],
+  barangayHasZone: [
+    'Bantay already covers this barangay.',
+    'Sakop na ng Bantay ang barangay na ito.',
+  ],
+  barangayLocating: ['Finding it on the map...', 'Hinahanap sa mapa...'],
+  barangayFoundAt: [
+    'New to Bantay: approval adds it, centred on',
+    'Bago sa Bantay: idadagdag ito kapag naaprubahan, nakasentro sa',
+  ],
+  barangayNotLocated: [
+    'Could not find it on the map, so the super admin will choose the area when approving.',
+    'Hindi ito makita sa mapa, kaya ang super admin ang pipili ng lugar sa pag-apruba.',
+  ],
   organization: ['Barangay or school office', 'Opisina ng barangay o paaralan'],
   organizationRequired: ['Enter your office.', 'Ilagay ang iyong opisina.'],
   accessReason: ['Why you need access (optional)', 'Bakit kailangan mo ng access (opsyonal)'],

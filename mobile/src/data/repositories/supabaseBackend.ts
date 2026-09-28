@@ -19,6 +19,7 @@ import {
 import {
   AccessRequest,
   AlertItem,
+  Barangay,
   HazardReport,
   SafeSpot,
   SavedRoute,
@@ -271,6 +272,7 @@ interface ZoneRow {
   center_lat: number;
   center_lng: number;
   radius_m: number;
+  psgc_code?: string | null;
 }
 
 const toZone = (row: ZoneRow): Zone => ({
@@ -280,6 +282,21 @@ const toZone = (row: ZoneRow): Zone => ({
   city: row.city,
   center: latLng(row.center_lat, row.center_lng),
   radiusMeters: row.radius_m,
+  psgcCode: row.psgc_code ?? null,
+});
+
+interface BarangayRow {
+  code: string;
+  name: string;
+  city: string;
+  province: string;
+}
+
+const toBarangay = (row: BarangayRow): Barangay => ({
+  code: row.code,
+  name: row.name,
+  city: row.city,
+  province: row.province,
 });
 
 interface AccessRequestRow {
@@ -292,12 +309,16 @@ interface AccessRequestRow {
   submitted_at: string;
   decided_at: string | null;
   decision_note: string | null;
+  psgc_code?: string | null;
+  /** Embedded from psgc_areas through the psgc_code foreign key. */
+  psgc?: BarangayRow | null;
 }
 
 const toAccessRequest = (row: AccessRequestRow): AccessRequest => ({
   id: row.id,
   role: parseEnum(OFFICIAL_ROLES, row.role, 'barangay_official'),
   zoneId: row.zone_id,
+  barangay: row.psgc ? toBarangay(row.psgc) : null,
   organization: row.organization,
   reason: row.reason,
   status: parseEnum(ACCESS_REQUEST_STATUSES, row.status, 'pending'),
@@ -358,7 +379,10 @@ class SupabaseBackend implements BantayBackend {
         db.from('spot_subscriptions').select('spot_id'),
         db.from('zones').select('*').order('name'),
         // Row Level Security returns only the caller's own requests.
-        db.from('access_requests').select('*').order('submitted_at', { ascending: false }),
+        db
+          .from('access_requests')
+          .select('*, psgc:psgc_areas(code, name, city, province)')
+          .order('submitted_at', { ascending: false }),
       ]);
 
     const firstError = [reports, votes, flags, safeSpots, routes, alerts, subs, zones, requests].find(
@@ -562,6 +586,9 @@ class SupabaseBackend implements BantayBackend {
       user_id: userId,
       role: input.role,
       zone_id: input.zoneId,
+      psgc_code: input.psgc?.code ?? null,
+      center_lat: input.psgc?.center?.lat ?? null,
+      center_lng: input.psgc?.center?.lng ?? null,
       organization: input.organization.trim(),
       reason: input.reason.trim(),
     });
@@ -570,6 +597,16 @@ class SupabaseBackend implements BantayBackend {
       throw new Error('You already have a request waiting for review.');
     }
     throw new Error(error.message);
+  }
+
+  async searchBarangays(query: string): Promise<Barangay[]> {
+    if (query.trim().length < 2) return [];
+    const { data, error } = await supabase().rpc('search_barangays', {
+      q: query.trim(),
+      max_results: 15,
+    });
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as BarangayRow[]).map(toBarangay);
   }
 
   /**

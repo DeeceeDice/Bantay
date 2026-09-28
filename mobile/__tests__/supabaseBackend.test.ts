@@ -87,8 +87,22 @@ function query(table: string) {
 type AuthListener = (event: string) => void;
 const authListeners = new Set<AuthListener>();
 
+const rpcCalls: { fn: string; args: unknown }[] = [];
+
 const mockClient = {
   from: query,
+  rpc: async (fn: string, args: unknown) => {
+    rpcCalls.push({ fn, args });
+    if (fn === 'search_barangays') {
+      return {
+        data: [
+          { code: '1381300022', name: 'Commonwealth', city: 'Quezon City', province: 'National Capital Region (NCR)' },
+        ],
+        error: null,
+      };
+    }
+    return { data: null, error: { message: `unknown function ${fn}` } };
+  },
   auth: {
     getUser: async () => ({ data: { user: state.userId ? { id: state.userId } : null } }),
     getSession: async () => ({
@@ -324,6 +338,35 @@ describe('SupabaseBackend.submitAccessRequest', () => {
     ]);
   });
 
+  it('files a PSGC barangay with the centre the app found for it', async () => {
+    state.userId = USER;
+    await createSupabaseBackend().submitAccessRequest(USER, {
+      ...input,
+      zoneId: null,
+      psgc: { code: '1381300050', center: latLng(14.6772, 121.066) },
+    });
+    expect(state.tables.access_requests).toEqual([
+      expect.objectContaining({
+        zone_id: null,
+        psgc_code: '1381300050',
+        center_lat: 14.6772,
+        center_lng: 121.066,
+      }),
+    ]);
+  });
+
+  it('files a PSGC barangay even when it could not be found on the map', async () => {
+    state.userId = USER;
+    await createSupabaseBackend().submitAccessRequest(USER, {
+      ...input,
+      zoneId: null,
+      psgc: { code: '1381300060', center: null },
+    });
+    expect(state.tables.access_requests).toEqual([
+      expect.objectContaining({ psgc_code: '1381300060', center_lat: null, center_lng: null }),
+    ]);
+  });
+
   it('explains the one-open-request rule instead of a database error', async () => {
     state.userId = USER;
     const backend = createSupabaseBackend();
@@ -331,6 +374,25 @@ describe('SupabaseBackend.submitAccessRequest', () => {
     await expect(backend.submitAccessRequest(USER, input)).rejects.toThrow(
       /already have a request waiting/,
     );
+  });
+});
+
+describe('SupabaseBackend.searchBarangays', () => {
+  it('asks the database, which holds the PSGC list', async () => {
+    rpcCalls.length = 0;
+    const found = await createSupabaseBackend().searchBarangays(' commonwealth quezon ');
+    expect(rpcCalls).toEqual([
+      { fn: 'search_barangays', args: { q: 'commonwealth quezon', max_results: 15 } },
+    ]);
+    expect(found).toEqual([
+      { code: '1381300022', name: 'Commonwealth', city: 'Quezon City', province: 'National Capital Region (NCR)' },
+    ]);
+  });
+
+  it('does not search on a single letter', async () => {
+    rpcCalls.length = 0;
+    expect(await createSupabaseBackend().searchBarangays('c')).toEqual([]);
+    expect(rpcCalls).toEqual([]);
   });
 });
 
@@ -346,12 +408,14 @@ describe('SupabaseBackend.loadAll', () => {
     ];
     state.tables.access_requests = [
       { id: 'r1', role: 'school_admin', zone_id: 'ust', organization: 'UST', reason: '', status: 'denied', submitted_at: '2026-09-27T00:00:00Z', decided_at: null, decision_note: 'Not staff' },
+      { id: 'r2', role: 'barangay_official', zone_id: null, organization: 'Council', reason: '', status: 'pending', submitted_at: '2026-09-28T00:00:00Z', decided_at: null, decision_note: null, psgc_code: '1381300060', psgc: { code: '1381300060', name: 'Sauyo', city: 'Quezon City', province: 'National Capital Region (NCR)' } },
     ];
     const snap = await createSupabaseBackend().loadAll();
     expect(snap.safeSpots.map((s) => s.id)).toEqual(['s1']);
     expect(snap.safeSpots[0].category).toBe('other');
     expect(snap.zones[0]).toMatchObject({ id: 'sampaloc', kind: 'barangay', radiusMeters: 1800 });
-    expect(snap.accessRequests[0]).toMatchObject({ status: 'denied', decisionNote: 'Not staff' });
+    expect(snap.accessRequests[0]).toMatchObject({ status: 'denied', decisionNote: 'Not staff', barangay: null });
+    expect(snap.accessRequests[1].barangay).toMatchObject({ name: 'Sauyo', city: 'Quezon City' });
   });
 });
 

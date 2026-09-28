@@ -84,6 +84,18 @@ export interface Zone {
   city: string;
   center: LatLng;
   radiusMeters: number;
+  /** The PSGC barangay this zone stands for, when it is one. */
+  psgcCode: string | null;
+}
+
+/** A barangay from the PSA's Philippine Standard Geographic Code. */
+export interface Barangay {
+  code: string;
+  name: string;
+  /** "Quezon City", or "Sampaloc, City of Manila". */
+  city: string;
+  /** The province, or the region where the city has none. */
+  province: string;
 }
 
 /** A request to be made an official, decided by a super admin. */
@@ -91,6 +103,8 @@ export interface AccessRequest {
   id: string;
   role: OfficialRole;
   zoneId: string | null;
+  /** The PSGC barangay asked for, when there was no zone for it yet. */
+  barangay: Barangay | null;
   organization: string;
   reason: string;
   status: AccessRequestStatus;

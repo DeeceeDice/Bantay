@@ -1,7 +1,9 @@
+import { LatLng } from '../../core/geo/latLng';
 import { OfficialRole, SelfServiceRole } from '../models/enums';
 import {
   AccessRequest,
   AlertItem,
+  Barangay,
   HazardReport,
   SafeSpot,
   SavedRoute,
@@ -45,7 +47,13 @@ export interface OwnProfilePatch {
 
 export interface AccessRequestInput {
   role: OfficialRole;
-  zoneId: string;
+  /** An existing zone, or null when a PSGC barangay is named instead. */
+  zoneId: string | null;
+  /**
+   * The official barangay, with the map centre found for it (null if none
+   * could be found). Approval turns it into a zone if there is none yet.
+   */
+  psgc?: { code: string; center: LatLng | null };
   organization: string;
   reason: string;
 }
@@ -70,6 +78,8 @@ export interface BantayBackend {
   setSubscribedSpots(spotIds: string[]): Promise<void>;
   updateOwnProfile(userId: string, patch: OwnProfilePatch): Promise<void>;
   submitAccessRequest(userId: string, input: AccessRequestInput): Promise<void>;
+  /** Barangays from PSGC whose name, city or province match every word. */
+  searchBarangays(query: string): Promise<Barangay[]>;
 
   /**
    * Notifies when another device changes shared data. Returns an unsubscribe

@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 
 import { Geo, LatLng, latLng } from '../../core/geo/latLng';
 import { severityRank } from '../models/enums';
-import { HazardReport } from '../models/types';
+import { Barangay, HazardReport } from '../models/types';
 import { ROUTE_HAZARD_THRESHOLD_METERS } from '../repositories/logic';
 
 /**
@@ -38,12 +38,13 @@ export interface PlaceResult {
 }
 
 /**
- * Text search, biased towards where the user is (or Metro Manila).
+ * Text search, biased towards where the user is (or Metro Manila); pass
+ * `null` for no bias, when the query already names the town and province.
  * Throws on network or API failure so the caller can fall back.
  */
 export async function searchPlacesOnline(
   query: string,
-  near: LatLng = MANILA,
+  near: LatLng | null = MANILA,
   signal?: AbortSignal,
 ): Promise<PlaceResult[]> {
   if (!isGoogleMapsConfigured()) throw new Error('No Google Maps key configured.');
@@ -59,9 +60,11 @@ export async function searchPlacesOnline(
       textQuery: query,
       regionCode: 'PH',
       maxResultCount: 5,
-      locationBias: {
-        circle: { center: { latitude: near.lat, longitude: near.lng }, radius: 20000 },
-      },
+      ...(near && {
+        locationBias: {
+          circle: { center: { latitude: near.lat, longitude: near.lng }, radius: 20000 },
+        },
+      }),
     }),
   });
   if (!res.ok) throw new Error(`Places search failed (${res.status}).`);
@@ -80,6 +83,15 @@ export async function searchPlacesOnline(
       location: latLng(p.location!.latitude, p.location!.longitude),
     }));
 }
+
+/**
+ * How to ask Places for a PSGC barangay, which has a name but no
+ * coordinates: "Barangay Sauyo, Quezon City, National Capital Region (NCR)".
+ */
+export const barangaySearchText = (b: Barangay): string =>
+  [/^barangay\b/i.test(b.name) ? b.name : `Barangay ${b.name}`, b.city, b.province]
+    .filter((part) => part.length > 0)
+    .join(', ');
 
 export type TravelMode = 'DRIVE' | 'WALK';
 

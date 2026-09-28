@@ -16,6 +16,7 @@ jest.mock('expo-constants', () => ({
 // eslint-disable-next-line import/first
 import {
   RouteOption,
+  barangaySearchText,
   computeRoutes,
   decodePolyline,
   googleMapsDirectionsUrl,
@@ -119,6 +120,16 @@ describe('hazardsOnPath', () => {
     const far = [Geo.offsetMeters(h.location, 2000, 0), Geo.offsetMeters(h.location, 2500, 0)];
     expect(hazardsOnPath(through, [h])).toEqual([h]);
     expect(hazardsOnPath(far, [h])).toEqual([]);
+  });
+});
+
+describe('barangaySearchText', () => {
+  it('names a PSGC barangay the way Places finds it', () => {
+    const b = { code: '1381300060', name: 'Sauyo', city: 'Quezon City', province: 'National Capital Region (NCR)' };
+    expect(barangaySearchText(b)).toBe('Barangay Sauyo, Quezon City, National Capital Region (NCR)');
+    expect(barangaySearchText({ ...b, name: 'Barangay 659', city: 'Ermita, City of Manila' })).toBe(
+      'Barangay 659, Ermita, City of Manila, National Capital Region (NCR)',
+    );
   });
 });
 
