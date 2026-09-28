@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BantayMap } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
+import { MapTypeToggle, usePlacementTiles } from '../src/components/map/usePlacementTiles';
 import { AppBar, Badge, Button, Card, StatusBanner } from '../src/components/ui';
 import { HazardPhoto } from '../src/components/ui/HazardPhoto';
 import { Field } from '../src/components/ui/AuthScaffold';
@@ -62,6 +63,7 @@ export default function ReportScreen(): React.ReactElement {
   const [submitted, setSubmitted] = useState<HazardReport | null>(null);
 
   const controller = useMapController({ center: location.current, zoom: 17 });
+  const tiles = usePlacementTiles();
   const addressLabel = describePoint(point);
 
   const hasInput = type !== null || severity !== null || photoUri !== null;
@@ -248,6 +250,7 @@ export default function ReportScreen(): React.ReactElement {
           <View style={styles.mapWrap}>
             <BantayMap
               controller={controller}
+              tileSource={tiles.source}
               onCameraChange={(camera) => setPoint(camera.center)}
             />
             {/* The pin is fixed to the centre and the map moves under it,
@@ -263,6 +266,14 @@ export default function ReportScreen(): React.ReactElement {
             >
               <MaterialIcons name="my-location" size={21} color={Colors.brandBlue} />
             </Pressable>
+            {tiles.googleAvailable && (
+              <MapTypeToggle
+                value={tiles.mapType}
+                onChange={tiles.setMapType}
+                labels={{ roadmap: s('mapRoadmap'), satellite: s('mapSatellite') }}
+                style={styles.mapType}
+              />
+            )}
           </View>
           <View style={styles.addressBar}>
             <MaterialCommunityIcons name="map-marker-outline" size={20} color={Colors.brandRed} />
@@ -536,6 +547,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 52,
   },
+  mapType: { position: 'absolute', top: 12, right: 14 },
   recentre: {
     position: 'absolute',
     right: 14,

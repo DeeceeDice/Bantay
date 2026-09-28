@@ -28,6 +28,9 @@ const API_KEY = readKey();
 
 export const isGoogleMapsConfigured = (): boolean => API_KEY.length > 0;
 
+/** The key itself, for URLs that must carry it (map tiles). */
+export const googleMapsApiKey = (): string => API_KEY;
+
 /** Metro Manila, so "España" means the boulevard and not the country. */
 const MANILA = latLng(14.5995, 120.9842);
 

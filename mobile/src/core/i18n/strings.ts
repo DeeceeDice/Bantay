@@ -286,6 +286,8 @@ const COPY = {
   ],
   routeOpenFailed: ['Could not open Google Maps.', 'Hindi mabuksan ang Google Maps.'],
   routeOnStreets: ['Following real streets', 'Sumusunod sa totoong kalye'],
+  mapRoadmap: ['Map', 'Mapa'],
+  mapSatellite: ['Satellite', 'Satellite'],
 
   profile: ['Profile', 'Profile'],
   reportsSubmitted: ['Submitted', 'Naisumite'],

@@ -5,6 +5,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { BantayMap, MapMarker, MapPolyline } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
+import { MapTypeToggle, usePlacementTiles } from '../src/components/map/usePlacementTiles';
 import { Button } from '../src/components/ui';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { PlacementPin } from '../src/components/ui/Pins';
@@ -33,6 +34,7 @@ export default function NewRouteScreen(): React.ReactElement {
   const { s, data, addRoute } = useApp();
   const location = useUserLocation();
   const controller = useMapController({ center: location.current, zoom: 15 });
+  const tiles = usePlacementTiles();
 
   const [start, setStart] = useState<LatLng | null>(null);
   const [end, setEnd] = useState<LatLng | null>(null);
@@ -152,7 +154,16 @@ export default function NewRouteScreen(): React.ReactElement {
           markers={markers}
           polylines={polylines}
           onPress={handleTap}
+          tileSource={tiles.source}
         />
+        {tiles.googleAvailable && (
+          <MapTypeToggle
+            value={tiles.mapType}
+            onChange={tiles.setMapType}
+            labels={{ roadmap: s('mapRoadmap'), satellite: s('mapSatellite') }}
+            style={styles.mapType}
+          />
+        )}
       </View>
 
       <View style={styles.footer}>
@@ -218,6 +229,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   mapWrap: { flex: 1 },
+  mapType: { position: 'absolute', top: 12, right: 14 },
   footer: {
     padding: Spacing.lg,
     borderTopWidth: 1,

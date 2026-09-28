@@ -118,16 +118,23 @@ API** over plain HTTPS (`src/data/google/googleMaps.ts`). The key is read from
 `expo.extra.googleMaps.apiKey`, where a demo key is already set.
 
 - **Restrict the key before sharing a build.** In Google Cloud → Credentials,
-  limit it to *Places API (New)* and *Routes API* and set a daily quota. A
+  limit it to *Places API (New)*, *Routes API* and *Map Tiles API* and set a
+  daily quota. A
   key shipped in an app can be read out of it, so the restriction and the
   quota are what protect the billing account.
-- **The map picture is not Google's.** The demo key is not enabled for the
-  Map Tiles API, so the base map still comes from `tileSource.ts`.
+- **Google tiles where you place a pin.** The report pin and new-route maps
+  ask the **Map Tiles API** for a session (`src/data/google/googleTiles.ts`)
+  and, if Google grants one, draw Google's roadmap with a Map / Satellite
+  switch. If it refuses, they keep the CARTO basemap and show no switch.
+  **The demo key currently refuses** (`403 ... are blocked`): in Google
+  Cloud, enable *Map Tiles API* for the project and add it to the key's
+  allowed APIs. No app change or rebuild is needed after that.
 - **Demo only, as it stands.** Google's terms do not allow Places or Routes
-  results to be shown on a non-Google map. That is fine for a private demo;
-  before a public release, either draw the map with Google (enable the Map
-  Tiles API, or move to the Maps SDK) or swap these two calls for an
-  OpenStreetMap-based search and router.
+  results to be shown on a non-Google map, and the main map and directions
+  still use CARTO. That is fine for a private demo; before a public release,
+  draw those with Google tiles too (and show Google's full attribution from
+  the tiles viewport call) or swap search and routing for OpenStreetMap-based
+  services.
 - **No key, no fake route.** Without one, search falls back to the built-in
   gazetteer and the directions screen says routing is unavailable, with the
   hand-off to the Google Maps app still working.
@@ -160,7 +167,7 @@ src/
   state/                App store, location provider
 scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
-__tests__/              109 tests
+__tests__/              114 tests
 ```
 
 The SQL is not in here. It lives in `supabase/` at the **repository root**,
@@ -181,7 +188,7 @@ supabase/scripts/       psgc_to_sql.py, loads the PSGC barangay list
 ```bash
 npm run typecheck        # tsc, strict
 npm run lint             # eslint, including the React Compiler rules
-npm test                 # 109 tests
+npm test                 # 114 tests
 npm run check:supabase   # verifies the database connection, schema and RLS
 ```
 
