@@ -3,16 +3,15 @@ import { Platform } from 'react-native';
 /**
  * Where the map fetches its raster tiles.
  *
- * IMPORTANT before you distribute this app: the default points at the
- * OpenStreetMap Foundation's volunteer-run tile servers, and their usage
- * policy forbids distributing a consumer app that uses them by default
- * without prior permission from the Operations Working Group. That is a
- * licensing rule, not a capacity one - it applies at any traffic level.
+ * CARTO's Voyager basemap: OpenStreetMap data, served from a CDN, with no API
+ * key and no account. The OpenStreetMap Foundation's own tile servers, used
+ * before, still left the map blank on phones even with a User-Agent naming the
+ * app, and their usage policy forbids apps from defaulting to them.
  *
- * The default exists so the app runs the moment you clone it. For any real
- * release point `urlTemplate` at a commercial provider (MapTiler, Stadia
- * Maps, Geoapify, Thunderforest) or self-host. Nothing else in the app has
- * to change. See https://operations.osmfoundation.org/policies/tiles/
+ * CARTO requires the attribution below to stay visible. Its free basemaps are
+ * meant for non-commercial use at moderate volume; for a large public release,
+ * take a CARTO plan or point `urlTemplate` at another provider (MapTiler,
+ * Stadia Maps, Thunderforest) - nothing else in the app has to change.
  */
 export interface TileSource {
   urlTemplate: string;
@@ -21,20 +20,19 @@ export interface TileSource {
   maxZoom: number;
   subdomains: string[];
   /**
-   * Sent with every tile request on Android and iOS. Tile servers require a
+   * Sent with every tile request on Android and iOS. Tile servers expect a
    * User-Agent that names the app: React Native's image loader otherwise
-   * sends a generic one (`okhttp/...` on Android), which OpenStreetMap
-   * answers with an "Access blocked" tile instead of the map.
+   * sends a generic one (`okhttp/...` on Android), which some servers block.
    */
   headers: Record<string, string>;
 }
 
-export const OPEN_STREET_MAP: TileSource = {
-  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution: '(c) OpenStreetMap contributors',
+export const CARTO_VOYAGER: TileSource = {
+  urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+  attribution: '(c) OpenStreetMap contributors (c) CARTO',
   minZoom: 3,
-  maxZoom: 19,
-  subdomains: [],
+  maxZoom: 20,
+  subdomains: ['a', 'b', 'c', 'd'],
   headers: {
     'User-Agent': 'Bantay/1.0 (community hazard mapping; +https://github.com/DeeceeDice/Bantay)',
   },

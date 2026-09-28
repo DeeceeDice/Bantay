@@ -70,16 +70,13 @@ same map and officials review reports in Bantay Admin. See
 [mobile/README.md](mobile/README.md) and
 [docs/SHARED_DATABASE.md](docs/SHARED_DATABASE.md).
 
-**No map API key is required, but swap the tile source before you distribute
-the app.** The map is a self-contained tile renderer
-([`mobile/src/components/map/`](mobile/src/components/map/)) drawing
-OpenStreetMap tiles. The default points at the OpenStreetMap Foundation's
-volunteer-run tile servers, and
-[their usage policy](https://operations.osmfoundation.org/policies/tiles/)
-forbids distributing a consumer app that uses them by default without prior
-permission. Point it at a commercial OSM provider (MapTiler, Stadia Maps,
-Geoapify, Thunderforest) or self-host - a one-line change in
-[`tileSource.ts`](mobile/src/components/map/tileSource.ts).
+**No map API key is required.** The map is a self-contained tile renderer
+([`mobile/src/components/map/`](mobile/src/components/map/)) drawing CARTO's
+Voyager basemap, which is OpenStreetMap data served from a CDN with no key or
+account. CARTO's free basemaps are meant for non-commercial use at moderate
+volume; for a large public release take a CARTO plan or point
+[`tileSource.ts`](mobile/src/components/map/tileSource.ts) at another provider
+(MapTiler, Stadia Maps, Thunderforest) - a one-line change.
 
 ---
 

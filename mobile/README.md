@@ -88,13 +88,12 @@ needs **no API key** to run, there is no per-map-view billing, and nothing
 depends on Google Play Services. The cost is no vector tiles, no 3D and no
 built-in routing — none of which this app needs.
 
-**Before you distribute the app**, change the tile source. The default points
-at OpenStreetMap's volunteer-run servers, and
-[their policy](https://operations.osmfoundation.org/policies/tiles/) forbids
-distributing a consumer app that uses them by default. That is a licensing
-rule and applies at any traffic level. Point
-`src/components/map/tileSource.ts` at MapTiler, Stadia, Geoapify or
-Thunderforest — a one-line change.
+**Tiles come from CARTO's Voyager basemap** (OpenStreetMap data, no key). The
+OpenStreetMap Foundation's own servers refuse requests from apps, which is why
+they are not used. CARTO's free basemaps are meant for non-commercial use at
+moderate volume; for a large public release take a CARTO plan or point
+`src/components/map/tileSource.ts` at MapTiler, Stadia or Thunderforest — a
+one-line change.
 
 ---
 

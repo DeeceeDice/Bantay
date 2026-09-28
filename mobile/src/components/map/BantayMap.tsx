@@ -24,7 +24,7 @@ import {
 } from '../../core/map/mapCamera';
 import { Colors } from '../../core/theme/colors';
 import { MapController } from './useMapController';
-import { OPEN_STREET_MAP, TileSource, tileImageSource } from './tileSource';
+import { CARTO_VOYAGER, TileSource, tileImageSource } from './tileSource';
 
 export type MarkerAnchor = 'bottom-centre' | 'centre';
 
@@ -95,7 +95,7 @@ export function BantayMap({
   markers = [],
   polylines = [],
   circles = [],
-  tileSource = OPEN_STREET_MAP,
+  tileSource = CARTO_VOYAGER,
   interactive = true,
   showAttribution = true,
   dimTiles = false,
