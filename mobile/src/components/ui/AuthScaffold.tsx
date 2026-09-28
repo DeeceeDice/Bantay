@@ -106,7 +106,11 @@ export function Field({
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
           autoComplete={autoComplete}
-          autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'}
+          // Emails and passwords are typed exactly: a keyboard that capitalizes
+          // or corrects a password makes it differ from the one Bantay Admin
+          // and other phones receive.
+          autoCapitalize={keyboardType === 'email-address' || secureTextEntry ? 'none' : 'sentences'}
+          autoCorrect={!(keyboardType === 'email-address' || secureTextEntry)}
           placeholder={placeholder}
           placeholderTextColor={Colors.inkFaint}
           onSubmitEditing={onSubmitEditing}
