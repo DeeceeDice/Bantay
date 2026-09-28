@@ -103,6 +103,8 @@ export interface AppActions {
     startLabel: string;
     end: LatLng;
     endLabel: string;
+    /** The street path between the two ends, when a router supplied one. */
+    path?: LatLng[];
   }): Promise<SavedRoute>;
   deleteRoute(routeId: string): Promise<void>;
   restoreRoute(route: SavedRoute): Promise<void>;
@@ -435,14 +437,18 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
         endLabel: input.endLabel,
         start: input.start,
         end: input.end,
-        // A single midpoint keeps the preview line from cutting a perfect
-        // diagonal through blocks it would never actually follow.
-        waypoints: [
-          {
-            lat: (input.start.lat + input.end.lat) / 2,
-            lng: (input.start.lng + input.end.lng) / 2,
-          },
-        ],
+        // The real street path when there is one. Without it, a single
+        // midpoint is the honest approximation: hazard matching then works on
+        // the straight line between the two ends.
+        waypoints:
+          input.path && input.path.length > 0
+            ? input.path
+            : [
+                {
+                  lat: (input.start.lat + input.end.lat) / 2,
+                  lng: (input.start.lng + input.end.lng) / 2,
+                },
+              ],
         createdAt: new Date().toISOString(),
       };
       await backend.upsertRoute(route);

@@ -136,6 +136,7 @@ const COPY = {
   reportInaccurate: ['Report inaccurate', 'I-report na mali'],
   flaggedForReview: ['Flagged for review. Thank you.', 'Naiulat para sa pagsusuri. Salamat.'],
   getDirections: ['Get Directions', 'Kumuha ng Direksyon'],
+  clearPlace: ['Remove pin', 'Alisin ang pin'],
   verifiedBadge: ['Verified', 'Beripikado'],
   pendingBadge: ['Pending verification', 'Naghihintay ng beripikasyon'],
   reportedBy: ['Reported by', 'Iniulat ni'],
@@ -259,17 +260,32 @@ const COPY = {
   routeSavedToast: ['Route saved.', 'Na-save ang ruta.'],
 
   routePreview: ['Route preview', 'Preview ng ruta'],
-  startNavigation: ['Start Navigation', 'Simulan ang Nabigasyon'],
-  endNavigation: ['End', 'Tapusin'],
   eta: ['ETA', 'ETA'],
   arriveIn: ['Arrive in', 'Darating sa'],
   distance: ['Distance', 'Layo'],
-  avoidingHazards: [
-    'Route avoids reported hazards.',
-    'Iniiwasan ng ruta ang mga naiulat na panganib.',
+  modeDrive: ['Drive', 'Sasakyan'],
+  modeWalk: ['Walk', 'Lakad'],
+  openInGoogleMaps: ['Open in Google Maps', 'Buksan sa Google Maps'],
+  routeLoading: ['Finding a route on real streets...', 'Naghahanap ng ruta sa totoong kalye...'],
+  routeUnavailable: ['Could not get a route right now.', 'Hindi makakuha ng ruta ngayon.'],
+  routeNoKey: [
+    'Street routing needs a Google Maps key, and none is set up. You can still open the trip in Google Maps.',
+    'Kailangan ng Google Maps key para sa ruta, at wala pang naka-set up. Mabubuksan mo pa rin ang biyahe sa Google Maps.',
   ],
-  navigatingTo: ['Navigating to', 'Papunta sa'],
-  youHaveArrived: ['You have arrived.', 'Nakarating ka na.'],
+  routeClear: [
+    'No verified hazards along this route.',
+    'Walang beripikadong panganib sa rutang ito.',
+  ],
+  routeAvoided: [
+    'Picked the route that avoids {n} verified hazard(s) on the other options.',
+    'Pinili ang rutang umiiwas sa {n} beripikadong panganib ng ibang ruta.',
+  ],
+  routeHazards: [
+    'Every route passes {n} verified hazard(s):',
+    'Dumadaan ang bawat ruta sa {n} beripikadong panganib:',
+  ],
+  routeOpenFailed: ['Could not open Google Maps.', 'Hindi mabuksan ang Google Maps.'],
+  routeOnStreets: ['Following real streets', 'Sumusunod sa totoong kalye'],
 
   profile: ['Profile', 'Profile'],
   reportsSubmitted: ['Submitted', 'Naisumite'],

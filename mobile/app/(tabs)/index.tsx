@@ -17,9 +17,14 @@ import { BantayMap, MapCircle, MapMarker } from '../../src/components/map/Bantay
 import { useMapController } from '../../src/components/map/useMapController';
 import { Badge, Button, StatusBanner } from '../../src/components/ui';
 import { HazardPhoto } from '../../src/components/ui/HazardPhoto';
-import { HazardPin, SafeSpotPin, UserLocationDot } from '../../src/components/ui/Pins';
+import {
+  HazardPin,
+  PlacementPin,
+  SafeSpotPin,
+  UserLocationDot,
+} from '../../src/components/ui/Pins';
 import { Sheet } from '../../src/components/ui/Sheet';
-import { Geo } from '../../src/core/geo/latLng';
+import { Geo, LatLng } from '../../src/core/geo/latLng';
 import { Colors, Radius, Shadow, Spacing } from '../../src/core/theme/colors';
 import {
   hazardIcon,
@@ -38,6 +43,14 @@ import { DEFAULT_CENTER } from '../../src/data/seed/seedData';
 import { searchPlaces } from '../../src/data/seed/gazetteer';
 import { useApp } from '../../src/state/appStore';
 import { useUserLocation } from '../../src/state/LocationProvider';
+import { usePlaceSearch } from '../../src/state/usePlaceSearch';
+
+/** A place picked from search: shown as a pin with a directions sheet. */
+interface PickedPlace {
+  name: string;
+  address: string;
+  location: LatLng;
+}
 
 /** The live hazard map: Bantay's home screen. */
 export default function MapScreen(): React.ReactElement {
@@ -62,6 +75,9 @@ export default function MapScreen(): React.ReactElement {
   const [safety, setSafety] = useState<SafetyCheckResult | null>(null);
   const [checking, setChecking] = useState(false);
   const [query, setQuery] = useState('');
+  const [pickedPlace, setPickedPlace] = useState<PickedPlace | null>(null);
+  const [placeSheetOpen, setPlaceSheetOpen] = useState(false);
+  const online = usePlaceSearch(query, userPoint);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // A deep link from Alerts or Safe Spots asks the map to focus something.
@@ -98,16 +114,31 @@ export default function MapScreen(): React.ReactElement {
     setChecking(false);
   }, [data.reports, userPoint, settings.alertRadiusKm]);
 
+  // Google's results first when there are any; the built-in gazetteer fills
+  // in (and is all there is offline), then the user's safe spots.
   const suggestions = useMemo(() => {
     if (query.trim().length === 0) return [];
-    const places = searchPlaces(query, 4).map((p) => ({
-      key: `place-${p.name}`,
-      label: p.name,
-      sub: p.area,
-      location: p.location,
-      icon: 'place' as const,
-      color: Colors.brandBlue,
-    }));
+    const seen = new Set<string>();
+    const places = [
+      ...online.results.map((p) => ({ name: p.name, address: p.address, location: p.location })),
+      ...searchPlaces(query, 4).map((p) => ({ name: p.name, address: p.area, location: p.location })),
+    ]
+      .filter((p) => {
+        const key = p.name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5)
+      .map((p) => ({
+        key: `place-${p.name}-${p.location.lat}`,
+        label: p.name,
+        sub: p.address,
+        location: p.location,
+        icon: 'place' as const,
+        color: Colors.brandBlue,
+        spotId: null as string | null,
+      }));
     const spots = data.safeSpots
       .filter((sp) => sp.name.toLowerCase().includes(query.toLowerCase()))
       .slice(0, 3)
@@ -118,9 +149,10 @@ export default function MapScreen(): React.ReactElement {
         location: sp.location,
         icon: safeSpotIcon(sp.category),
         color: Colors.safe,
+        spotId: sp.id as string | null,
       }));
     return [...places, ...spots];
-  }, [query, data.safeSpots]);
+  }, [query, online.results, data.safeSpots]);
 
   const markers = useMemo<MapMarker[]>(() => {
     const out: MapMarker[] = [];
@@ -175,6 +207,17 @@ export default function MapScreen(): React.ReactElement {
       data.reports.filter((r) => r.status === 'verified').forEach((r) => pushHazard(r.id));
     }
 
+    if (pickedPlace) {
+      out.push({
+        id: 'picked-place',
+        point: pickedPlace.location,
+        width: 46,
+        height: 55,
+        onPress: () => setPlaceSheetOpen(true),
+        render: () => <PlacementPin size={46} />,
+      });
+    }
+
     out.push({
       id: 'user',
       point: userPoint,
@@ -193,6 +236,7 @@ export default function MapScreen(): React.ReactElement {
     selectedSpotId,
     userPoint,
     hasRealFix,
+    pickedPlace,
   ]);
 
   const circles = useMemo<MapCircle[]>(() => {
@@ -239,6 +283,7 @@ export default function MapScreen(): React.ReactElement {
             placeholderTextColor={Colors.inkFaint}
             accessibilityLabel={s('searchHint')}
           />
+          {online.searching && <ActivityIndicator size="small" color={Colors.brandBlue} />}
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} hitSlop={10}>
               <MaterialIcons name="close" size={19} color={Colors.inkMuted} />
@@ -263,6 +308,13 @@ export default function MapScreen(): React.ReactElement {
                 onPress={() => {
                   controller.moveTo(item.location, 16.5);
                   setQuery('');
+                  if (item.spotId) {
+                    setSelectedSpotId(item.spotId);
+                    setSelectedReportId(null);
+                  } else {
+                    setPickedPlace({ name: item.label, address: item.sub, location: item.location });
+                    setPlaceSheetOpen(true);
+                  }
                 }}
               >
                 <MaterialIcons name={item.icon} size={18} color={item.color} />
@@ -597,6 +649,57 @@ export default function MapScreen(): React.ReactElement {
                 }}
               />
             </View>
+          </View>
+        )}
+      </Sheet>
+
+      {/* A place picked from search. */}
+      <Sheet visible={placeSheetOpen && !!pickedPlace} onClose={() => setPlaceSheetOpen(false)}>
+        {pickedPlace && (
+          <View>
+            <View style={styles.sheetHeader}>
+              <View style={[styles.sheetIcon, { backgroundColor: Colors.brandBlueLight }]}>
+                <MaterialIcons name="place" size={24} color={Colors.brandBlue} />
+              </View>
+              <View style={styles.sheetTitleBox}>
+                <Text style={styles.sheetTitle}>{pickedPlace.name}</Text>
+                <Text style={styles.sheetSub}>{pickedPlace.address}</Text>
+              </View>
+            </View>
+            <View style={styles.badgeRow}>
+              <Badge
+                label={Geo.formatDistance(Geo.distanceMeters(userPoint, pickedPlace.location))}
+                color={Colors.brandBlue}
+                icon="near-me"
+              />
+            </View>
+            <Button
+              label={s('getDirections')}
+              icon="directions"
+              style={styles.sheetAction}
+              onPress={() => {
+                const target = pickedPlace;
+                setPlaceSheetOpen(false);
+                router.push({
+                  pathname: '/directions',
+                  params: {
+                    lat: String(target.location.lat),
+                    lng: String(target.location.lng),
+                    label: target.name,
+                  },
+                });
+              }}
+            />
+            <Button
+              label={s('clearPlace')}
+              variant="text"
+              icon="close"
+              color={Colors.inkMuted}
+              onPress={() => {
+                setPlaceSheetOpen(false);
+                setPickedPlace(null);
+              }}
+            />
           </View>
         )}
       </Sheet>

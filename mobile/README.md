@@ -68,8 +68,20 @@ filterable down to just your saved routes.
 **Safe spots** — malls, schools, evacuation centres and covered terminals,
 nearest first, with a subscribe toggle.
 
-**Saved routes** — a live "Clear" / "2 hazards" badge measured against the
-actual route line, not just its endpoints.
+**Search** — type a place, street or business and Google Places finds it,
+biased to where you are; a built-in list of Manila landmarks and your safe
+spots answer too, and are all there is offline. Pick a result to drop a pin
+and get directions to it.
+
+**Directions** — real street routes from Google's Routes API, by car or on
+foot. Bantay asks for every alternative Google offers and shows the one that
+passes the fewest (and least severe) verified hazards; if every option passes
+one, the hazards are named rather than hidden. Turn-by-turn is handed to the
+Google Maps app with one tap.
+
+**Saved routes** — the route you tap out is snapped to real streets, and its
+live "Clear" / "2 hazards" badge is measured against that street path, not
+just its endpoints.
 
 **Profile** — role badge, stats, a trust score derived from your
 verified-to-rejected ratio, alert radius, and an English / Filipino toggle
@@ -83,10 +95,10 @@ that translates the whole interface.
 Mercator projection, a gesture-driven camera, a raster tile layer and SVG
 vector overlays.
 
-Building it rather than embedding a vendor SDK buys three things: the app
-needs **no API key** to run, there is no per-map-view billing, and nothing
-depends on Google Play Services. The cost is no vector tiles, no 3D and no
-built-in routing — none of which this app needs.
+Building it rather than embedding a vendor SDK buys three things: drawing the
+map needs **no API key**, there is no per-map-view billing, and nothing
+depends on Google Play Services. The cost is no vector tiles and no 3D, which
+this app does not need.
 
 **Tiles come from CARTO's Voyager basemap** (OpenStreetMap data, no key). The
 OpenStreetMap Foundation's own servers refuse requests from apps, which is why
@@ -94,6 +106,28 @@ they are not used. CARTO's free basemaps are meant for non-commercial use at
 moderate volume; for a large public release take a CARTO plan or point
 `src/components/map/tileSource.ts` at MapTiler, Stadia or Thunderforest — a
 one-line change.
+
+### Google Maps Platform: search and routing only
+
+Search and street routing call Google's **Places API (New)** and **Routes
+API** over plain HTTPS (`src/data/google/googleMaps.ts`). The key is read from
+`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`, else `app.json` →
+`expo.extra.googleMaps.apiKey`, where a demo key is already set.
+
+- **Restrict the key before sharing a build.** In Google Cloud → Credentials,
+  limit it to *Places API (New)* and *Routes API* and set a daily quota. A
+  key shipped in an app can be read out of it, so the restriction and the
+  quota are what protect the billing account.
+- **The map picture is not Google's.** The demo key is not enabled for the
+  Map Tiles API, so the base map still comes from `tileSource.ts`.
+- **Demo only, as it stands.** Google's terms do not allow Places or Routes
+  results to be shown on a non-Google map. That is fine for a private demo;
+  before a public release, either draw the map with Google (enable the Map
+  Tiles API, or move to the Maps SDK) or swap these two calls for an
+  OpenStreetMap-based search and router.
+- **No key, no fake route.** Without one, search falls back to the built-in
+  gazetteer and the directions screen says routing is unavailable, with the
+  hand-off to the Google Maps app still working.
 
 ---
 
@@ -104,7 +138,7 @@ app/                    Screens (expo-router file-based routing)
   (tabs)/               Map, Alerts, Safe Spots, Profile
   report.tsx            The four-step report flow
   verification.tsx      Official's queue
-  directions.tsx        Route preview + simulated navigation
+  directions.tsx        Street route preview, safest alternative, Google Maps hand-off
 src/
   core/
     geo/                Coordinates, distance, bearing, path maths
@@ -116,13 +150,14 @@ src/
     map/                The map component, controller and tile source
     ui/                 Buttons, badges, cards, pins, sheets
   data/
+    google/             Places search and Routes API client
     models/             Domain types and enums
     repositories/       Backend seam, local + Supabase, pure domain logic
     seed/               Sample Manila data and the offline gazetteer
   state/                App store, location provider
 scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
-__tests__/              70 tests
+__tests__/              104 tests
 ```
 
 The SQL is not in here. It lives in `supabase/` at the **repository root**,
@@ -142,7 +177,7 @@ supabase/seed.sql       sample spots and hazards
 ```bash
 npm run typecheck        # tsc, strict
 npm run lint             # eslint, including the React Compiler rules
-npm test                 # 70 tests
+npm test                 # 104 tests
 npm run check:supabase   # verifies the database connection, schema and RLS
 ```
 
@@ -151,8 +186,9 @@ says so and exits rather than pretending to pass.
 
 Tests cover the Mercator projection and camera maths, geographic distance
 including point-to-path, the verification loop, one-vote-per-user enforcement,
-area-scoped moderation, safety checks, route hazard matching and trust-score
-bounds.
+area-scoped moderation, safety checks, route hazard matching, trust-score
+bounds, and the Google client: polyline decoding, path simplification and
+safest-route choice.
 
 ---
 
