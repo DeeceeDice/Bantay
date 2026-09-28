@@ -12,11 +12,21 @@ jest.mock('expo-constants', () => ({
   default: { expoConfig: { extra: { googleMaps: { apiKey: 'test-key' } } } },
 }));
 
+jest.mock('../src/data/repositories/supabaseClient', () => ({ supabase: () => ({}) }));
+
+// The shared free-tier counter: granted unless a test says otherwise.
+const mockClaim = jest.fn(async (_api: string) => true);
+jest.mock('../src/data/google/freeTier', () => ({
+  ...jest.requireActual('../src/data/google/freeTier'),
+  claimGoogleCall: (api: string) => mockClaim(api),
+}));
+
 // Imported after the mock so the module reads the stubbed key.
 // eslint-disable-next-line import/first
 import {
   RouteOption,
   barangaySearchText,
+  clearGoogleCaches,
   computeRoutes,
   decodePolyline,
   googleMapsDirectionsUrl,
@@ -26,6 +36,14 @@ import {
   searchPlacesOnline,
   simplifyPath,
 } from '../src/data/google/googleMaps';
+// eslint-disable-next-line import/first
+import { FreeTierExhausted } from '../src/data/google/freeTier';
+
+beforeEach(() => {
+  clearGoogleCaches();
+  mockClaim.mockClear();
+  mockClaim.mockImplementation(async () => true);
+});
 
 const NOW = new Date('2026-09-23T12:00:00Z');
 const hazards = verifiedHazards(seedReports(NOW));
@@ -139,6 +157,54 @@ describe('googleMapsDirectionsUrl', () => {
     expect(url).toBe(
       'https://www.google.com/maps/dir/?api=1&origin=14.6,120.98&destination=14.61,120.99&travelmode=walking',
     );
+  });
+});
+
+describe('keeping Google free', () => {
+  const a = latLng(14.6091, 120.9892);
+  const b = latLng(14.5896, 120.9817);
+  const oneRoute = { routes: [{ distanceMeters: 900, duration: '600s', polyline: { encodedPolyline: EXAMPLE } }] };
+
+  it('takes a ticket before every Google call', async () => {
+    stubFetch(200, oneRoute);
+    await computeRoutes(a, b, 'DRIVE', []);
+    expect(mockClaim).toHaveBeenCalledWith('routes_compute');
+    stubFetch(200, { places: [] });
+    await searchPlacesOnline('UST');
+    expect(mockClaim).toHaveBeenCalledWith('places_text_search');
+  });
+
+  it('does not call Google at all once the month is used up', async () => {
+    mockClaim.mockImplementation(async () => false);
+    const fetchMock = stubFetch(200, oneRoute);
+    await expect(computeRoutes(a, b, 'DRIVE', [])).rejects.toBeInstanceOf(FreeTierExhausted);
+    await expect(searchPlacesOnline('UST')).rejects.toBeInstanceOf(FreeTierExhausted);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('pays once for the same route or search', async () => {
+    const fetchMock = stubFetch(200, oneRoute);
+    await computeRoutes(a, b, 'WALK', []);
+    const again = await computeRoutes(a, b, 'WALK', [hazards[0]]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mockClaim).toHaveBeenCalledTimes(1);
+    expect(again[0].path.length).toBeGreaterThan(0); // hazards re-checked, route reused
+
+    const placesFetch = stubFetch(200, { places: [] });
+    await searchPlacesOnline('ust');
+    await searchPlacesOnline(' UST ');
+    expect(placesFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for traffic-free routes, billed as Compute Routes Essentials', async () => {
+    const fetchMock = stubFetch(200, oneRoute);
+    await computeRoutes(a, b, 'DRIVE', []);
+    await computeRoutes(a, b, 'WALK', []);
+    const drive = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const walk = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(drive.routingPreference).toBe('TRAFFIC_UNAWARE');
+    expect(walk.routingPreference).toBeUndefined();
+    expect(fetchMock.mock.calls[0][1].headers['X-Goog-FieldMask']).not.toMatch(/traffic|toll/i);
   });
 });
 

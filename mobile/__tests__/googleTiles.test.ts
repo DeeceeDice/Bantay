@@ -7,6 +7,7 @@ jest.mock('expo-constants', () => ({
   __esModule: true,
   default: { expoConfig: { extra: { googleMaps: { apiKey: 'test-key' } } } },
 }));
+jest.mock('../src/data/google/freeTier', () => ({ claimGoogleCall: async () => true }));
 
 // eslint-disable-next-line import/first
 import { tileUrl } from '../src/components/map/tileSource';

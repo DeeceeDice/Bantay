@@ -112,16 +112,23 @@ one-line change.
 
 ### Google Maps Platform: search and routing only
 
+**Stays free:** every Google call takes a ticket from a shared monthly
+counter in the database that stops 10% under Google's free allowance, and
+falls back to something free when it runs out. The settings only the
+account owner can make (per-day quotas on the Google project, key
+restrictions, 0 USD spending limits) are in
+**[docs/FREE_TIER.md](../docs/FREE_TIER.md)**.
+
 Search and street routing call Google's **Places API (New)** and **Routes
 API** over plain HTTPS (`src/data/google/googleMaps.ts`). The key is read from
 `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`, else `app.json` →
 `expo.extra.googleMaps.apiKey`, where a demo key is already set.
 
-- **Restrict the key before sharing a build.** In Google Cloud → Credentials,
-  limit it to *Places API (New)*, *Routes API* and *Map Tiles API* and set a
-  daily quota. A
-  key shipped in an app can be read out of it, so the restriction and the
-  quota are what protect the billing account.
+- **Restrict the key before sharing a build.** Limit it to *Places API
+  (New)*, *Routes API* and *Map Tiles API* and set per-day quotas, as in
+  [docs/FREE_TIER.md](../docs/FREE_TIER.md). A key shipped in an app can be
+  read out of it, so the restriction and the quotas protect the billing
+  account.
 - **Google tiles where you place a pin.** The report pin and new-route maps
   ask the **Map Tiles API** for a session (`src/data/google/googleTiles.ts`)
   and, if Google grants one, draw Google's roadmap with a Map / Satellite
@@ -167,7 +174,7 @@ src/
   state/                App store, location provider
 scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
-__tests__/              114 tests
+__tests__/              121 tests
 ```
 
 The SQL is not in here. It lives in `supabase/` at the **repository root**,
@@ -188,7 +195,7 @@ supabase/scripts/       psgc_to_sql.py, loads the PSGC barangay list
 ```bash
 npm run typecheck        # tsc, strict
 npm run lint             # eslint, including the React Compiler rules
-npm test                 # 114 tests
+npm test                 # 121 tests
 npm run check:supabase   # verifies the database connection, schema and RLS
 ```
 

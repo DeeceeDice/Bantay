@@ -4,7 +4,7 @@
 citizens, a requester, an approved official and a super admin. It covers the
 privilege guard, private profiles, report filing, access requests, zone-scoped
 review, suspension, safe-spot management, broadcasts, the audit log and PSGC
-barangay requests - 90 checks, each run as the role a real client would be.
+barangay requests and the free-tier guard - 98 checks, each run as the role a real client would be.
 
 CI runs it on every push (the "Database rules" job). To run it locally you
 need Postgres 16 and `psql`:
@@ -18,6 +18,7 @@ psql -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
 psql -v ON_ERROR_STOP=1 -q -f supabase/migrations/20260927000000_admin_console.sql
 psql -v ON_ERROR_STOP=1 -q -f supabase/migrations/20260928120000_psgc.sql
 psql -v ON_ERROR_STOP=1 -q -f supabase/migrations/20260928130000_psgc_search_accents.sql
+psql -v ON_ERROR_STOP=1 -q -f supabase/migrations/20260928140000_free_tier_guard.sql
 python3 supabase/tests/rules_test.py
 ```
 

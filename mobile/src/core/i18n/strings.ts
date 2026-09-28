@@ -287,6 +287,10 @@ const COPY = {
   routeOpenFailed: ['Could not open Google Maps.', 'Hindi mabuksan ang Google Maps.'],
   routeOnStreets: ['Following real streets', 'Sumusunod sa totoong kalye'],
   mapRoadmap: ['Map', 'Mapa'],
+  freeTierUsedUp: [
+    "This month's free routing is used up. Open in Google Maps still works.",
+    'Ubos na ang libreng ruta ngayong buwan. Gumagana pa rin ang Buksan sa Google Maps.',
+  ],
   mapSatellite: ['Satellite', 'Satellite'],
 
   profile: ['Profile', 'Profile'],

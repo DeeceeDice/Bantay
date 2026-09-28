@@ -268,5 +268,22 @@ check("...and the audit entry says the zone was created", row == "1381300050|tru
 expect_ok("approving a barangay with a zone reuses it", f"select decide_access_request('{TREQ}', true);", S)
 check("...no second zone", admin("select count(*) from zones where psgc_code = '1381300022'") == "1")
 
+# --- free-tier guard for Google calls ---------------------------------------------
+expect_ok("a signed-in phone gets a ticket for a Google call",
+          "select claim_api_call('routes_compute')::text;", A, "true")
+expect_error("a signed-out client gets none", "select claim_api_call('routes_compute');", None,
+             "permission denied", role="anon")
+expect_ok("an unknown API gets none", "select claim_api_call('geocoding')::text;", A, "false")
+admin("update api_limits set monthly_limit = 2 where api = 'places_text_search';")
+expect_ok("tickets stop at the monthly limit, for everyone together",
+          "select string_agg(claim_api_call('places_text_search')::text, ',') from generate_series(1, 3);",
+          A, "true,true,false")
+expect_ok("...another account is refused too", "select claim_api_call('places_text_search')::text;", B, "false")
+expect_ok("usage is reported against the free allowance",
+          "select used || '/' || monthly_limit || '/' || free_per_month from api_usage_this_month() where api = 'places_text_search';",
+          A, "2/2/5000")
+expect_error("clients cannot reset the counter", "delete from api_usage;", S, "permission denied")
+expect_error("clients cannot raise the limit", "update api_limits set monthly_limit = 99999;", S, "permission denied")
+
 print(f"\n{sum(results)}/{len(results)} passed")
 sys.exit(0 if all(results) else 1)

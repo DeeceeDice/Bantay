@@ -17,6 +17,9 @@ on:
     paths:
       - 'mobile/**'
       - '!mobile/**/*.md'
+      # Tests and docs do not change the app: no 30-minute build for them.
+      - '!mobile/__tests__/**'
+      - '!mobile/docs/**'
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 
@@ -31,7 +34,9 @@ jobs:
   apk:
     name: Build and publish the Bantay APK
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Private repositories get 2,000 free Actions minutes a month; a stuck
+    # Gradle build must not eat them.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: mobile
@@ -60,13 +65,25 @@ jobs:
           npm run lint
           npm test -- --ci
 
+      # Reuses Gradle's downloads and build cache between runs (Actions cache
+      # storage is free up to 10 GB per repository), which cuts the build time
+      # - and the free minutes it uses - substantially.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
       - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install --clean
 
       - name: Build the release APK
         working-directory: mobile/android
         # Real phones are ARM; skipping the emulator ABIs halves the build.
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+        run: ./gradlew assembleRelease --no-daemon --build-cache -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
 
       - name: Name the APK
         id: apk
@@ -83,6 +100,9 @@ jobs:
           name: ${{ steps.apk.outputs.name }}
           path: mobile/${{ steps.apk.outputs.name }}
           if-no-files-found: error
+          # The Release below keeps the APK for good (release files are free);
+          # this copy only counts against the 500 MB of artifact storage.
+          retention-days: 1
 
       - name: Publish a release
         if: github.ref == 'refs/heads/main'

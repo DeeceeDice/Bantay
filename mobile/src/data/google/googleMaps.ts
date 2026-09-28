@@ -4,6 +4,7 @@ import { Geo, LatLng, latLng } from '../../core/geo/latLng';
 import { severityRank } from '../models/enums';
 import { Barangay, HazardReport } from '../models/types';
 import { ROUTE_HAZARD_THRESHOLD_METERS } from '../repositories/logic';
+import { FreeTierExhausted, claimGoogleCall } from './freeTier';
 
 /**
  * Google Maps Platform, used for the two things Bantay cannot do well alone:
@@ -31,6 +32,25 @@ export const isGoogleMapsConfigured = (): boolean => API_KEY.length > 0;
 /** The key itself, for URLs that must carry it (map tiles). */
 export const googleMapsApiKey = (): string => API_KEY;
 
+/**
+ * Answers already paid for are kept for the rest of the session, so asking
+ * again (the same search, re-opening the same directions) costs nothing.
+ */
+const CACHE_SIZE = 100;
+const placeCache = new Map<string, PlaceResult[]>();
+const routeCache = new Map<string, { path: LatLng[]; distanceMeters: number; durationSeconds: number }[]>();
+
+function remember<T>(cache: Map<string, T>, key: string, value: T): void {
+  if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value as string);
+  cache.set(key, value);
+}
+
+/** For tests. */
+export function clearGoogleCaches(): void {
+  placeCache.clear();
+  routeCache.clear();
+}
+
 /** Metro Manila, so "España" means the boulevard and not the country. */
 const MANILA = latLng(14.5995, 120.9842);
 
@@ -51,6 +71,10 @@ export async function searchPlacesOnline(
   signal?: AbortSignal,
 ): Promise<PlaceResult[]> {
   if (!isGoogleMapsConfigured()) throw new Error('No Google Maps key configured.');
+  const cacheKey = `${query.trim().toLowerCase()}|${near ? `${near.lat.toFixed(2)},${near.lng.toFixed(2)}` : '-'}`;
+  const cached = placeCache.get(cacheKey);
+  if (cached) return cached;
+  if (!(await claimGoogleCall('places_text_search'))) throw new FreeTierExhausted();
   const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     signal,
@@ -78,13 +102,15 @@ export async function searchPlacesOnline(
       location?: { latitude: number; longitude: number };
     }[];
   };
-  return (body.places ?? [])
+  const results = (body.places ?? [])
     .filter((p) => p.location && p.displayName?.text)
     .map((p) => ({
       name: p.displayName!.text!,
       address: p.formattedAddress ?? '',
       location: latLng(p.location!.latitude, p.location!.longitude),
     }));
+  remember(placeCache, cacheKey, results);
+  return results;
 }
 
 /**
@@ -122,6 +148,17 @@ export async function computeRoutes(
   signal?: AbortSignal,
 ): Promise<RouteOption[]> {
   if (!isGoogleMapsConfigured()) throw new Error('No Google Maps key configured.');
+  // About 10 m: moving a step does not make it a new (billed) route.
+  const cacheKey = [origin.lat, origin.lng, destination.lat, destination.lng]
+    .map((n) => n.toFixed(4))
+    .concat(mode)
+    .join('|');
+  const withHazards = (
+    raw: { path: LatLng[]; distanceMeters: number; durationSeconds: number }[],
+  ): RouteOption[] => raw.map((r) => ({ ...r, hazards: hazardsOnPath(r.path, hazards) }));
+  const cached = routeCache.get(cacheKey);
+  if (cached) return withHazards(cached);
+  if (!(await claimGoogleCall('routes_compute'))) throw new FreeTierExhausted();
   const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
     method: 'POST',
     signal,
@@ -136,6 +173,9 @@ export async function computeRoutes(
         location: { latLng: { latitude: destination.lat, longitude: destination.lng } },
       },
       travelMode: mode,
+      // Traffic-aware routing would make this Compute Routes Pro (half the
+      // free allowance); walking takes no preference at all.
+      ...(mode === 'DRIVE' && { routingPreference: 'TRAFFIC_UNAWARE' }),
       computeAlternativeRoutes: true,
       languageCode: 'en-US',
       regionCode: 'PH',
@@ -148,15 +188,16 @@ export async function computeRoutes(
   const routes = (body.routes ?? []).filter((r) => r.polyline?.encodedPolyline);
   if (routes.length === 0) throw new Error('No route found between these points.');
 
-  return routes.map((r) => {
+  const raw = routes.map((r) => {
     const path = decodePolyline(r.polyline!.encodedPolyline!);
     return {
       path,
       distanceMeters: r.distanceMeters ?? Geo.pathLengthMeters(path),
       durationSeconds: Number.parseInt(String(r.duration ?? '0').replace('s', ''), 10) || 0,
-      hazards: hazardsOnPath(path, hazards),
     };
   });
+  remember(routeCache, cacheKey, raw);
+  return withHazards(raw);
 }
 
 export const hazardsOnPath = (

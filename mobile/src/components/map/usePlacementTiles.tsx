@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Radius, Shadow } from '../../core/theme/colors';
+import { claimGoogleCall } from '../../data/google/freeTier';
 import { GoogleMapType, loadGoogleTiles } from '../../data/google/googleTiles';
 import { CARTO_VOYAGER, TileSource } from './tileSource';
 
@@ -11,6 +12,9 @@ import { CARTO_VOYAGER, TileSource } from './tileSource';
  *
  * `googleAvailable` is only true once Google has actually issued a session,
  * so the Map / Satellite switch never appears unless both work.
+ *
+ * Each view with Google tiles takes a ticket from the shared free-tier
+ * counter; when this month's are gone the map is CARTO again (free).
  */
 export function usePlacementTiles(): {
   source: TileSource;
@@ -23,9 +27,11 @@ export function usePlacementTiles(): {
 
   useEffect(() => {
     let live = true;
-    void loadGoogleTiles(mapType).then((source) => {
-      if (live) setLoaded((prev) => ({ ...prev, [mapType]: source }));
-    });
+    void loadGoogleTiles(mapType)
+      .then(async (source) => (source && (await claimGoogleCall('map_tiles_view')) ? source : null))
+      .then((source) => {
+        if (live) setLoaded((prev) => ({ ...prev, [mapType]: source }));
+      });
     return () => {
       live = false;
     };

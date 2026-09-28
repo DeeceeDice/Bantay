@@ -19,6 +19,7 @@ import {
   isGoogleMapsConfigured,
   pickSafestRoute,
 } from '../src/data/google/googleMaps';
+import { FreeTierExhausted } from '../src/data/google/freeTier';
 import { verifiedHazards } from '../src/data/repositories/logic';
 import { useApp } from '../src/state/appStore';
 import { useUserLocation } from '../src/state/LocationProvider';
@@ -76,7 +77,12 @@ export default function DirectionsScreen(): React.ReactElement {
         setResult({
           key: requestKey,
           ok: false,
-          message: error instanceof Error ? error.message : String(error),
+          message:
+            error instanceof FreeTierExhausted
+              ? s('freeTierUsedUp')
+              : error instanceof Error
+                ? error.message
+                : String(error),
         });
       },
     );

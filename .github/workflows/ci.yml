@@ -13,6 +13,8 @@ jobs:
   mobile:
     name: Android app (typecheck, lint, test, bundle)
     runs-on: ubuntu-24.04
+    # A hung job would otherwise burn up to six hours of free minutes.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: mobile
@@ -43,16 +45,14 @@ jobs:
       - name: Bundle for Android
         run: npx expo export --platform android --output-dir dist
 
-      - name: Upload bundle
-        uses: actions/upload-artifact@v6
-        with:
-          name: bantay-rn-bundle
-          path: mobile/dist
-          retention-days: 14
+      # No artifact upload: the bundle is only built to prove it builds.
+      # Artifacts count against the private repository's 500 MB of free
+      # storage, and nobody downloads this one.
 
   database:
     name: Database rules (Postgres)
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     # Bantay and Bantay Admin share one database, and everything that decides
     # who may do what lives in it - so it is tested as a client would meet
     # it: as the `authenticated` role, with a JWT, against real Postgres.
