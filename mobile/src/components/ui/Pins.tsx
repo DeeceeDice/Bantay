@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { HazardType, ReportStatus, SafeSpotCategory } from '../../data/models/enums';
 import { Colors } from '../../core/theme/colors';
@@ -131,42 +131,22 @@ export function PlacementPin({
   );
 }
 
-/** Height over width of each artwork file, so the logo reserves its space. */
-const MARK_ASPECT = 0.502;
-const LOCKUP_ASPECT = 0.703;
-
 /**
- * The Bantay mark: a blue eye whose iris holds a red map pin.
+ * The Bantay mark: a blue eye whose pupil is a red map pin.
  *
- * Rendered from the brand artwork in `assets/` so every screen shows exactly
- * the logo the app icons are cut from. `size` is the mark's width; with
- * `wordmark` the full lockup, eye over the BANTAY wordmark, is drawn at twice
- * that width so the lettering stays legible.
+ * Drawn as vector rather than shipped as a raster so it stays crisp at every
+ * size and the brand colours come from one source of truth.
  */
-export function BantayLogo({
-  size = 64,
-  wordmark = false,
-}: {
-  size?: number;
-  wordmark?: boolean;
-}): React.ReactElement {
-  if (wordmark) {
-    const width = size * 2;
-    return (
-      <Image
-        source={require('../../../assets/bantay-logo.png')}
-        style={{ width, height: width * LOCKUP_ASPECT }}
-        accessibilityRole="image"
-        accessibilityLabel="Bantay"
-      />
-    );
-  }
+export function BantayLogo({ size = 64 }: { size?: number }): React.ReactElement {
+  const height = size * 0.72;
   return (
-    <Image
-      source={require('../../../assets/bantay-mark.png')}
-      style={{ width: size, height: size * MARK_ASPECT }}
-      accessible={false}
-    />
+    <Svg width={size} height={height} viewBox="0 0 100 72">
+      <Path d="M0 36 Q50 -6 100 36 Q50 78 0 36 Z" fill={Colors.brandBlue} />
+      <Path d="M10 36 Q50 6 90 36 Q50 66 10 36 Z" fill={Colors.white} />
+      <Circle cx="50" cy="32" r="19" fill={Colors.brandRed} />
+      <Path d="M36 44 L50 68 L64 44 Z" fill={Colors.brandRed} />
+      <Circle cx="44" cy="26" r="6" fill={Colors.white} opacity={0.92} />
+    </Svg>
   );
 }
 
