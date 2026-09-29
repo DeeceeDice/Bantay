@@ -44,7 +44,7 @@ export function AuthScaffold({
           <View style={styles.inner}>
             {showLogo && (
               <View style={styles.logo}>
-                <BantayLogo size={62} />
+                <BantayLogo size={96} />
                 <Text style={styles.wordmark}>Bantay</Text>
               </View>
             )}

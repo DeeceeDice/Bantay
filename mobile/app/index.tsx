@@ -53,7 +53,7 @@ export default function SplashScreen(): React.ReactElement {
   return (
     <View style={styles.container}>
       <View style={styles.logoCircle}>
-        <BantayLogo size={92} />
+        <BantayLogo size={118} />
       </View>
       <Text style={styles.wordmark}>Bantay</Text>
       <Text style={styles.tagline}>{s('tagline')}</Text>
@@ -69,10 +69,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A true circle whatever the logo's proportions (the eye is twice as wide
+  // as it is tall).
   logoCircle: {
+    width: 160,
+    height: 160,
     backgroundColor: Colors.white,
-    borderRadius: 999,
-    padding: 26,
+    borderRadius: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   wordmark: {
     fontSize: 40,

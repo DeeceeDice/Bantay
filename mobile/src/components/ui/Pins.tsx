@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, G, Path } from 'react-native-svg';
+import { Image, StyleSheet, View } from 'react-native';
+import Svg, { G, Path } from 'react-native-svg';
 
 import { HazardType, ReportStatus, SafeSpotCategory } from '../../data/models/enums';
 import { Colors } from '../../core/theme/colors';
@@ -157,21 +157,22 @@ export function PlacementPin({
 }
 
 /**
- * The Bantay mark: a blue eye whose pupil is a red map pin.
- *
- * Drawn as vector rather than shipped as a raster so it stays crisp at every
- * size and the brand colours come from one source of truth.
+ * The Bantay logo: a blue eye whose pupil is a red map pin. The official
+ * artwork (the same as the app icon), bundled at 640 px so it stays sharp at
+ * every size the app shows it.
  */
+const LOGO_MARK = require('../../../assets/bantay-mark.png') as number;
+const LOGO_ASPECT = 321 / 640;
+
 export function BantayLogo({ size = 64 }: { size?: number }): React.ReactElement {
-  const height = size * 0.72;
   return (
-    <Svg width={size} height={height} viewBox="0 0 100 72">
-      <Path d="M0 36 Q50 -6 100 36 Q50 78 0 36 Z" fill={Colors.brandBlue} />
-      <Path d="M10 36 Q50 6 90 36 Q50 66 10 36 Z" fill={Colors.white} />
-      <Circle cx="50" cy="32" r="19" fill={Colors.brandRed} />
-      <Path d="M36 44 L50 68 L64 44 Z" fill={Colors.brandRed} />
-      <Circle cx="44" cy="26" r="6" fill={Colors.white} opacity={0.92} />
-    </Svg>
+    <Image
+      source={LOGO_MARK}
+      style={{ width: size, height: size * LOGO_ASPECT }}
+      resizeMode="contain"
+      accessibilityRole="image"
+      accessibilityLabel="Bantay"
+    />
   );
 }
 
