@@ -103,7 +103,9 @@ map needs **no API key**, there is no per-map-view billing, and nothing
 depends on Google Play Services. The cost is no vector tiles and no 3D, which
 this app does not need.
 
-**Tiles come from CARTO's Voyager basemap** (OpenStreetMap data, no key). The
+**Tiles come from CARTO's Voyager basemap** (OpenStreetMap data), requested
+with the project's CARTO key from `app.json` → `expo.extra.carto.apiKey` (or
+`EXPO_PUBLIC_CARTO_API_KEY`); without a key they load as the public basemap. The
 OpenStreetMap Foundation's own servers refuse requests from apps, which is why
 they are not used. CARTO's free basemaps are meant for non-commercial use at
 moderate volume; for a large public release take a CARTO plan or point
@@ -174,7 +176,7 @@ src/
   state/                App store, location provider
 scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
-__tests__/              121 tests
+__tests__/              123 tests
 ```
 
 The SQL is not in here. It lives in `supabase/` at the **repository root**,
@@ -195,7 +197,7 @@ supabase/scripts/       psgc_to_sql.py, loads the PSGC barangay list
 ```bash
 npm run typecheck        # tsc, strict
 npm run lint             # eslint, including the React Compiler rules
-npm test                 # 121 tests
+npm test                 # 123 tests
 npm run check:supabase   # verifies the database connection, schema and RLS
 ```
 

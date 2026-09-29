@@ -70,10 +70,11 @@ same map and officials review reports in Bantay Admin. See
 [mobile/README.md](mobile/README.md) and
 [docs/SHARED_DATABASE.md](docs/SHARED_DATABASE.md).
 
-**No map API key is required.** The map is a self-contained tile renderer
+**The map needs no SDK.** It is a self-contained tile renderer
 ([`mobile/src/components/map/`](mobile/src/components/map/)) drawing CARTO's
-Voyager basemap, which is OpenStreetMap data served from a CDN with no key or
-account. CARTO's free basemaps are meant for non-commercial use at moderate
+Voyager basemap (OpenStreetMap data from a CDN). Tile requests carry the
+project's CARTO key from `mobile/app.json` (`expo.extra.carto.apiKey`); with
+no key they still load, as the public basemap. CARTO's free basemaps are meant for non-commercial use at moderate
 volume; for a large public release take a CARTO plan or point
 [`tileSource.ts`](mobile/src/components/map/tileSource.ts) at another provider
 (MapTiler, Stadia Maps, Thunderforest) - a one-line change.

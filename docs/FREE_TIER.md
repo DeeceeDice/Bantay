@@ -9,7 +9,7 @@ after that, nothing can bill.
 | --- | --- | --- |
 | Supabase (Free plan) | 500 MB database, 1 GB file storage, 50,000 monthly active users, 5 GB egress | Accounts, reports, alerts, PSGC |
 | Google Maps Platform | Per SKU per month: 10,000 Essentials calls, 5,000 Pro calls, 100,000 2D map tiles | Place search, street routes, placement-map tiles |
-| CARTO Voyager basemap | Free for non-commercial use, no key | The map picture |
+| CARTO Voyager basemap | Free for non-commercial use; requests carry the project's CARTO key | The map picture |
 | PSA PSGC API | Free with a token | Barangay list (loaded once into Supabase) |
 | GitHub Actions (private repo) | 2,000 minutes and 500 MB artifact storage a month | CI and the APK build |
 | GitHub Releases | Free, no storage limit on release files | APK downloads |
@@ -116,5 +116,14 @@ stops the jobs when the free minutes run out instead of charging.
 ## CARTO
 
 Free for non-commercial use at moderate volume, with the attribution the
-map already shows. A commercial or large public release needs a CARTO plan
-or another free-tier provider in `mobile/src/components/map/tileSource.ts`.
+map already shows. Every tile request carries the project's CARTO key
+(`mobile/app.json` -> `expo.extra.carto.apiKey`), so CARTO attributes the
+traffic to this project. Tiles are served with a six-month cache lifetime,
+so repeat views of the same area mostly come from the CDN and the phone's
+image cache rather than new requests.
+
+**You set:** in the CARTO dashboard, keep the key on the free plan and
+check its usage page now and then. The key only reads public basemap tiles
+and ships inside the app, so it grants nothing else. A commercial or large
+public release needs a CARTO plan or another free-tier provider in
+`mobile/src/components/map/tileSource.ts`.

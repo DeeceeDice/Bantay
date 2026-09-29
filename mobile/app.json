@@ -30,6 +30,9 @@
       "googleMaps": {
         "apiKey": "AIzaSyDhaGdCx6dRMEcug7hukRWor7bOwdnHeAo"
       },
+      "carto": {
+        "apiKey": "cb1_42s7_1_62c71b368fd45d08e369db35"
+      },
       "supabase": {
         "url": "https://rkcnhdrasdzyweufffnc.supabase.co",
         "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrY25oZHJhc2R6eXdldWZmZm5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNzcwNDksImV4cCI6MjEwNTc1MzA0OX0.L8N7v5JRFaR5tXhADn2r9eA9I4P3ekghRtVdylO94fY"

@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 /**
@@ -12,6 +13,11 @@ import { Platform } from 'react-native';
  * meant for non-commercial use at moderate volume; for a large public release,
  * take a CARTO plan or point `urlTemplate` at another provider (MapTiler,
  * Stadia Maps, Thunderforest) - nothing else in the app has to change.
+ *
+ * Requests carry the project's CARTO key (`EXPO_PUBLIC_CARTO_API_KEY`, else
+ * `app.json` -> `expo.extra.carto.apiKey`), which CARTO answers with its
+ * fuller Voyager render and counts against the key's own allowance. With no
+ * key the tiles still load, as the public basemap.
  */
 export interface TileSource {
   urlTemplate: string;
@@ -27,8 +33,20 @@ export interface TileSource {
   headers: Record<string, string>;
 }
 
-export const CARTO_VOYAGER: TileSource = {
-  urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+function readCartoKey(): string {
+  const extra = (Constants.expoConfig?.extra ?? {}) as { carto?: { apiKey?: unknown } };
+  const fromApp = extra.carto?.apiKey;
+  return (
+    process.env.EXPO_PUBLIC_CARTO_API_KEY?.trim() ||
+    (typeof fromApp === 'string' ? fromApp.trim() : '')
+  );
+}
+
+/** CARTO Voyager, with `key` on every tile request when there is one. */
+export const cartoVoyager = (key: string): TileSource => ({
+  urlTemplate:
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png' +
+    (key ? `?key=${encodeURIComponent(key)}` : ''),
   attribution: '(c) OpenStreetMap contributors (c) CARTO',
   minZoom: 3,
   maxZoom: 20,
@@ -36,7 +54,9 @@ export const CARTO_VOYAGER: TileSource = {
   headers: {
     'User-Agent': 'Bantay/1.0 (community hazard mapping; +https://github.com/DeeceeDice/Bantay)',
   },
-};
+});
+
+export const CARTO_VOYAGER: TileSource = cartoVoyager(readCartoKey());
 
 export function tileUrl(source: TileSource, x: number, y: number, z: number): string {
   let url = source.urlTemplate
