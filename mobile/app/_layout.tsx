@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -10,6 +11,14 @@ import { isSupabaseConfigured } from '../src/data/repositories/supabaseClient';
 import { AppProvider, useApp } from '../src/state/appStore';
 import { LocationProvider } from '../src/state/LocationProvider';
 
+// Keep the phone's own splash up until the first screen has drawn, then fade
+// it out, so there is never a blank frame between the two. The loading screen
+// underneath draws the same white circle in the same place on the same blue.
+void SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ duration: 300, fade: true });
+
+const hideSplash = (): void => SplashScreen.hide();
+
 /**
  * Application root: dependency wiring and global chrome.
  *
@@ -19,17 +28,25 @@ import { LocationProvider } from '../src/state/LocationProvider';
 export default function RootLayout(): React.ReactElement {
   // A build with no database is a broken build, not an offline mode. Say so
   // instead of letting someone "sign up" into nowhere.
-  if (!isSupabaseConfigured()) return <NotConnected />;
+  if (!isSupabaseConfigured()) {
+    return (
+      <View style={styles.root} onLayout={hideSplash}>
+        <NotConnected />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaProvider>
-      <AppProvider>
-        <LocationProvider>
-          <StatusBar style="dark" />
-          <RootStack />
-        </LocationProvider>
-      </AppProvider>
-    </SafeAreaProvider>
+    <View style={styles.root} onLayout={hideSplash}>
+      <SafeAreaProvider>
+        <AppProvider>
+          <LocationProvider>
+            <StatusBar style="dark" />
+            <RootStack />
+          </LocationProvider>
+        </AppProvider>
+      </SafeAreaProvider>
+    </View>
   );
 }
 
@@ -103,6 +120,7 @@ function NotConnected(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: Colors.brandBlue },
   notConnected: {
     flex: 1,
     justifyContent: 'center',

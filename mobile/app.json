@@ -8,11 +8,6 @@
     "scheme": "bantay",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1B4FA0"
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -41,7 +36,16 @@
     "plugins": [
       "expo-router",
       "expo-location",
-      "expo-image-picker"
+      "expo-image-picker",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#1B4FA0"
+        }
+      ]
     ]
   }
 }

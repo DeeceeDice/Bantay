@@ -1,7 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { BantayLogo } from '../src/components/ui/Pins';
 import { Colors, Spacing } from '../src/core/theme/colors';
@@ -50,42 +59,114 @@ export default function SplashScreen(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, user, settings.locationGranted]);
 
+  // The name and tagline rise in under the logo; a soft ring keeps pulsing
+  // outward from it - Bantay is watching - until the next screen is ready.
+  const [intro] = useState(() => new Animated.Value(0));
+  const [pulse] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    Animated.timing(intro, {
+      toValue: 1,
+      duration: 520,
+      delay: 120,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+    const loop = Animated.loop(
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    );
+    let live = true;
+    // No endless motion for people who have asked their phone for less.
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (live && !reduce) loop.start();
+    });
+    return () => {
+      live = false;
+      loop.stop();
+    };
+  }, [intro, pulse]);
+
   return (
     <View style={styles.container}>
-      <View style={styles.logoCircle}>
-        <BantayLogo size={118} />
+      <StatusBar style="light" />
+      {/* Same size and place as the white circle on the phone's own splash,
+          so the hand-over from it is seamless. */}
+      <View style={styles.center} pointerEvents="none">
+        <Animated.View
+          style={[
+            styles.ring,
+            {
+              opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) }],
+            },
+          ]}
+        />
+        <View style={styles.logoCircle}>
+          <BantayLogo size={118} />
+        </View>
       </View>
-      <Text style={styles.wordmark}>Bantay</Text>
-      <Text style={styles.tagline}>{s('tagline')}</Text>
-      <ActivityIndicator color={Colors.white} style={styles.spinner} />
+      <Animated.View
+        style={[
+          styles.below,
+          {
+            opacity: intro,
+            transform: [{ translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+          },
+        ]}
+      >
+        <Text style={styles.wordmark}>BANTAY</Text>
+        <Text style={styles.tagline}>{s('tagline')}</Text>
+        <ActivityIndicator color={Colors.white} style={styles.spinner} />
+      </Animated.View>
     </View>
   );
 }
 
+const CIRCLE = 160;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.brandBlue,
+  container: { flex: 1, backgroundColor: Colors.brandBlue },
+  center: {
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ring: {
+    position: 'absolute',
+    width: CIRCLE,
+    height: CIRCLE,
+    borderRadius: CIRCLE / 2,
+    backgroundColor: Colors.white,
   },
   // A true circle whatever the logo's proportions (the eye is twice as wide
   // as it is tall).
   logoCircle: {
-    width: 160,
-    height: 160,
+    width: CIRCLE,
+    height: CIRCLE,
+    borderRadius: CIRCLE / 2,
     backgroundColor: Colors.white,
-    borderRadius: 80,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Starts just under the circle, which stays exactly at the centre.
+  below: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    marginTop: CIRCLE / 2 + Spacing.xxl,
+    alignItems: 'center',
+  },
   wordmark: {
-    fontSize: 40,
+    fontSize: 30,
     fontWeight: '800',
     color: Colors.white,
-    marginTop: Spacing.xxl,
-    letterSpacing: -1,
+    letterSpacing: 6,
   },
   tagline: { fontSize: 15.5, color: 'rgba(255,255,255,0.88)', marginTop: Spacing.sm },
-  spinner: { marginTop: 44 },
+  spinner: { marginTop: 36 },
 });
