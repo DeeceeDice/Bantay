@@ -49,7 +49,9 @@ export const cartoVoyager = (key: string): TileSource => ({
     (key ? `?key=${encodeURIComponent(key)}` : ''),
   attribution: '(c) OpenStreetMap contributors (c) CARTO',
   minZoom: 3,
-  maxZoom: 20,
+  // Voyager has real tiles to zoom 19; zoom 20 comes back blank, so deeper
+  // zooms enlarge the zoom-19 tiles instead.
+  maxZoom: 19,
   subdomains: ['a', 'b', 'c', 'd'],
   headers: {
     'User-Agent': 'Bantay/1.0 (community hazard mapping; +https://github.com/DeeceeDice/Bantay)',

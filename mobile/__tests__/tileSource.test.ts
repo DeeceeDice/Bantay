@@ -38,6 +38,10 @@ describe('tile source', () => {
     expect(tileImageSource(CARTO_VOYAGER, 1, 2, 3, 'android').uri).toMatch(/\?key=cb1_test_key$/);
   });
 
+  it('never asks CARTO for zoom 20, which it serves blank', () => {
+    expect(CARTO_VOYAGER.maxZoom).toBe(19);
+  });
+
   it('still loads the public basemap with no key', () => {
     expect(PUBLIC.urlTemplate).not.toContain('key=');
   });
