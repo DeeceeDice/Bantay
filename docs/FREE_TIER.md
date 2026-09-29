@@ -11,7 +11,7 @@ after that, nothing can bill.
 | Google Maps Platform | Per SKU per month: 10,000 Essentials calls, 5,000 Pro calls, 100,000 2D map tiles | Place search, street routes, placement-map tiles |
 | CARTO Voyager basemap | Free for non-commercial use; requests carry the project's CARTO key | The map picture |
 | PSA PSGC API | Free with a token | Barangay list (loaded once into Supabase) |
-| GitHub Actions (private repo) | 2,000 minutes and 500 MB artifact storage a month | CI and the APK build |
+| GitHub Actions (private repo) | 2,000 minutes and 500 MB artifact storage a month | The APK build (the only workflow) |
 | GitHub Releases | Free, no storage limit on release files | APK downloads |
 
 ---
@@ -99,13 +99,15 @@ a week with no requests; opening the app or the dashboard wakes it.
 
 **Already done**
 
-- CI no longer uploads a bundle artifact; the APK artifact is kept for 1
-  day (the Release keeps the APK for good, and release files are free).
+- The only workflow is the APK build (the separate CI workflow was removed;
+  the APK job still typechecks, lints and tests before building). Its
+  artifact is kept for 1 day (the Release keeps the APK for good, and
+  release files are free).
 - 87 old artifacts (2.2 GB, mostly from the earlier Flutter builds) were
   deleted - the account was far over the 500 MB free storage.
 - The APK build caches Gradle between runs, skips pushes that only change
-  tests or docs, and has a 45-minute timeout; CI jobs time out after 15
-  and 10 minutes, so a stuck job cannot eat the month's minutes.
+  tests or docs, and has a 45-minute timeout, so a stuck build cannot eat
+  the month's minutes.
 
 **You set:** *github.com -> Settings -> Billing and plans -> Spending
 limits*: keep Actions (and Packages) at **0 USD**. With a 0 limit GitHub

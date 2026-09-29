@@ -6,7 +6,7 @@ privilege guard, private profiles, report filing, access requests, zone-scoped
 review, suspension, safe-spot management, broadcasts, the audit log and PSGC
 barangay requests and the free-tier guard - 98 checks, each run as the role a real client would be.
 
-CI runs it on every push (the "Database rules" job). To run it locally you
+Nothing runs it automatically (the repository only builds the APK). To run it you
 need Postgres 16 and `psql`:
 
 ```bash

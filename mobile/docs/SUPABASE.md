@@ -213,7 +213,7 @@ and reports, in order: whether the
 keys are present and are the *anon* key rather than the service key, whether
 the project answers, whether Bantay's 8 core tables exist, and whether Row Level
 Security actually refuses an anonymous reader. It exits non-zero on failure,
-so CI can gate on it.
+so a script can gate on it.
 
 To also verify the signup trigger and the seed data, give it an account you
 have already created in the app:
