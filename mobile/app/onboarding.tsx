@@ -5,6 +5,7 @@ import React, { useRef, useState } from 'react';
 import {
   Dimensions,
   LayoutChangeEvent,
+  LayoutRectangle,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -21,16 +22,21 @@ import { Colors, Spacing } from '../src/core/theme/colors';
 import { StoreKeys } from '../src/data/repositories/storeKeys';
 import { useApp } from '../src/state/appStore';
 
-const { width } = Dimensions.get('window');
-
 /** Three skippable slides explaining what Bantay does before asking to sign up. */
 export default function OnboardingScreen(): React.ReactElement {
   const { s } = useApp();
   const scroller = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
-  // A horizontal pager does not stretch its pages to its own height, so the
-  // slides are sized to it once it is laid out and centred inside that.
-  const [pagerHeight, setPagerHeight] = useState(0);
+  // A horizontal pager does not stretch its pages to its own size, so the
+  // slides are sized to it once it is laid out and centred inside that. The
+  // window is only a first guess: in a browser the app sits in a phone-sized
+  // column far narrower than the window, and slides as wide as the window
+  // would put their content off to the side, out of view.
+  const [pager, setPager] = useState<Pick<LayoutRectangle, 'width' | 'height'>>({
+    width: Dimensions.get('window').width,
+    height: 0,
+  });
+  const width = pager.width;
 
   const slides: { icon: React.ReactElement; accent: string; title: string; body: string }[] = [
     {
@@ -67,7 +73,7 @@ export default function OnboardingScreen(): React.ReactElement {
   };
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>): void => {
-    setIndex(Math.round(event.nativeEvent.contentOffset.x / width));
+    if (width > 0) setIndex(Math.round(event.nativeEvent.contentOffset.x / width));
   };
 
   return (
@@ -86,14 +92,23 @@ export default function OnboardingScreen(): React.ReactElement {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onScroll}
-        onLayout={(e: LayoutChangeEvent) => setPagerHeight(e.nativeEvent.layout.height)}
+        // Tracked while scrolling rather than when the fling ends: browsers
+        // never report the end of a fling, so the dots and the button would
+        // stay on the first slide.
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+        onLayout={(e: LayoutChangeEvent) => {
+          const { width: w, height: h } = e.nativeEvent.layout;
+          setPager({ width: w, height: h });
+          // Keep the current slide in view if the column is resized.
+          scroller.current?.scrollTo({ x: w * index, animated: false });
+        }}
         style={styles.pager}
       >
         {slides.map((slide) => (
           <View
             key={slide.title}
-            style={[styles.slide, { width, height: pagerHeight || undefined }]}
+            style={[styles.slide, { width, height: pager.height || undefined }]}
           >
             <View style={[styles.iconOuter, { backgroundColor: `${slide.accent}1A` }]}>
               <View style={[styles.iconInner, { backgroundColor: `${slide.accent}29` }]}>
