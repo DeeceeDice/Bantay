@@ -1,0 +1,84 @@
+# Publishes the same Bantay app for browsers on GitHub Pages:
+# https://deeceedice.github.io/Bantay/
+#
+# Built from mobile/ with Expo's web target, so it is the APK's code, signs in
+# to the same Supabase database and shares every account, report and alert
+# with the phone app and Bantay Admin. Every push to main that touches mobile/
+# redeploys it.
+#
+# Free: a build takes a couple of minutes of the 2,000 free Actions minutes,
+# GitHub Pages is included in the plan, and the Pages artifact is kept 1 day.
+
+name: Web app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '!mobile/**/*.md'
+      - '!mobile/__tests__/**'
+      - '!mobile/docs/**'
+      - '.github/workflows/web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the browser app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test -- --ci
+
+      - name: Export for the web
+        env:
+          # The site lives at /Bantay/, not at the domain root.
+          EXPO_BASE_URL: /Bantay
+        run: npx expo export --platform web
+
+      # Any path (a refresh on /Bantay/login, a shared link) is answered with
+      # the app, which then routes itself.
+      - name: Serve every route from the app
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: mobile/dist
+
+  deploy:
+    name: Publish on GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

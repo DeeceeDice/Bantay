@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { WEB_COLUMN_WIDTH, isWeb } from '../../core/platform/web';
 import { Colors, Radius, Spacing } from '../../core/theme/colors';
 
 /**
@@ -54,6 +55,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
     maxHeight: '88%',
+    // In a browser, as wide as the app's column rather than the window.
+    ...(isWeb && { width: '100%', maxWidth: WEB_COLUMN_WIDTH, alignSelf: 'center' }),
   },
   handle: {
     width: 40,

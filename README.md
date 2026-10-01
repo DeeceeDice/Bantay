@@ -21,8 +21,16 @@ it; everyone nearby sees it on a live map.
    [Bantay Admin](https://github.com/DeeceeDice/Bantay_Admin), the officials'
    console, which shares the same database.
 
-A new APK is published automatically on every push to `main` that changes
-the app (see [docs/RELEASING.md](docs/RELEASING.md)).
+**In a browser — nothing to install**
+
+Open **https://deeceedice.github.io/Bantay/** on a phone or computer. It is
+the same app built for the web: the same accounts, reports, alerts and maps.
+On a computer it keeps a phone-sized column, and the mouse wheel zooms the
+map.
+
+A new APK and a new web build are published automatically on every push to
+`main` that changes the app (see [docs/RELEASING.md](docs/RELEASING.md) and
+`.github/workflows/web.yml`).
 
 ---
 

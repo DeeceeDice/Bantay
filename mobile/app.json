@@ -46,6 +46,16 @@
           "backgroundColor": "#1B4FA0"
         }
       ]
-    ]
+    ],
+    "web": {
+      "name": "Bantay",
+      "shortName": "Bantay",
+      "description": "Community hazard map for the Philippines.",
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro",
+      "themeColor": "#1B4FA0",
+      "backgroundColor": "#1B4FA0"
+    }
   }
 }

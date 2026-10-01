@@ -11,7 +11,8 @@ after that, nothing can bill.
 | Google Maps Platform | Per SKU per month: 10,000 Essentials calls, 5,000 Pro calls, 100,000 2D map tiles | Place search, street routes, placement-map tiles |
 | CARTO Voyager basemap | Free for non-commercial use; requests carry the project's CARTO key | The map picture |
 | PSA PSGC API | Free with a token | Barangay list (loaded once into Supabase) |
-| GitHub Actions (private repo) | 2,000 minutes and 500 MB artifact storage a month | The APK build (the only workflow) |
+| GitHub Actions (private repo) | 2,000 minutes and 500 MB artifact storage a month | The APK build and the web build |
+| GitHub Pages (included in the Pro plan) | Free hosting, 100 GB bandwidth a month (soft limit) | The browser app at deeceedice.github.io/Bantay |
 | GitHub Releases | Free, no storage limit on release files | APK downloads |
 
 ---
@@ -81,6 +82,23 @@ uses three SKUs:
 
 ---
 
+## The browser app
+
+The site at https://deeceedice.github.io/Bantay/ is public, and everything a
+browser runs can be read by anyone who opens it - including the keys in
+`mobile/app.json`:
+
+- The **Supabase anon key** is meant to be public; Row Level Security
+  decides what it can do.
+- The **CARTO key** only reads public map tiles.
+- The **Google Maps key** is the one that matters. The app's monthly ticket
+  counter keeps honest use inside the free tier, but someone could copy the
+  key out of the site and call Google directly. The per-day quotas and API
+  restrictions under *Google Maps Platform -> You set* above are what make
+  that impossible to bill. Set them.
+
+---
+
 ## Supabase
 
 **Already done:** the database is about 20 MB of the 500 MB allowance
@@ -99,10 +117,11 @@ a week with no requests; opening the app or the dashboard wakes it.
 
 **Already done**
 
-- The only workflow is the APK build (the separate CI workflow was removed;
-  the APK job still typechecks, lints and tests before building). Its
+- Two workflows: the APK build (it typechecks, lints and tests before
+  building) and the web build (tests, then a couple of minutes to export and
+  publish to GitHub Pages). The separate CI workflow was removed. The APK
   artifact is kept for 1 day (the Release keeps the APK for good, and
-  release files are free).
+  release files are free); the Pages artifact is also kept for 1 day.
 - 87 old artifacts (2.2 GB, mostly from the earlier Flutter builds) were
   deleted - the account was far over the 500 MB free storage.
 - The APK build caches Gradle between runs, skips pushes that only change

@@ -6,7 +6,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppBar } from '../src/components/ui';
-import { Colors, Spacing } from '../src/core/theme/colors';
+import { WEB_COLUMN_WIDTH, isWeb } from '../src/core/platform/web';
+import { installWebAlert } from '../src/core/platform/webAlert';
+import { Colors, Shadow, Spacing } from '../src/core/theme/colors';
 import { isSupabaseConfigured } from '../src/data/repositories/supabaseClient';
 import { AppProvider, useApp } from '../src/state/appStore';
 import { LocationProvider } from '../src/state/LocationProvider';
@@ -18,6 +20,11 @@ void SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 300, fade: true });
 
 const hideSplash = (): void => SplashScreen.hide();
+
+// In a browser, alerts become the browser's own dialogs (React Native's do
+// nothing there), and on a wide screen the app keeps its phone-sized column
+// instead of stretching across a monitor.
+installWebAlert();
 
 /**
  * Application root: dependency wiring and global chrome.
@@ -31,21 +38,25 @@ export default function RootLayout(): React.ReactElement {
   if (!isSupabaseConfigured()) {
     return (
       <View style={styles.root} onLayout={hideSplash}>
-        <NotConnected />
+        <View style={isWeb ? styles.webColumn : styles.fill}>
+          <NotConnected />
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.root} onLayout={hideSplash}>
-      <SafeAreaProvider>
-        <AppProvider>
-          <LocationProvider>
-            <StatusBar style="dark" />
-            <RootStack />
-          </LocationProvider>
-        </AppProvider>
-      </SafeAreaProvider>
+      <View style={isWeb ? styles.webColumn : styles.fill}>
+        <SafeAreaProvider>
+          <AppProvider>
+            <LocationProvider>
+              <StatusBar style="dark" />
+              <RootStack />
+            </LocationProvider>
+          </AppProvider>
+        </SafeAreaProvider>
+      </View>
     </View>
   );
 }
@@ -120,7 +131,20 @@ function NotConnected(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.brandBlue },
+  root: {
+    flex: 1,
+    backgroundColor: isWeb ? '#E6ECF5' : Colors.brandBlue,
+    alignItems: isWeb ? 'center' : 'stretch',
+  },
+  fill: { flex: 1 },
+  webColumn: {
+    flex: 1,
+    width: '100%',
+    maxWidth: WEB_COLUMN_WIDTH,
+    overflow: 'hidden',
+    backgroundColor: Colors.surface,
+    ...Shadow.floating,
+  },
   notConnected: {
     flex: 1,
     justifyContent: 'center',

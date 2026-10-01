@@ -22,6 +22,7 @@ import {
   toScreen,
   topLeftWorld,
 } from '../../core/map/mapCamera';
+import { isWeb } from '../../core/platform/web';
 import { Colors } from '../../core/theme/colors';
 import { MapController } from './useMapController';
 import { CARTO_VOYAGER, TileSource, tileImageSource } from './tileSource';
@@ -119,6 +120,28 @@ export function BantayMap({
     live.current = { controller, onPress, onCameraChange, interactive };
   }, [controller, onPress, onCameraChange, interactive]);
 
+  // In a browser there is no pinch: the mouse wheel zooms about the cursor,
+  // through the same `anchored` maths as a pinch so the spot under the
+  // pointer stays put.
+  const containerRef = useRef<View>(null);
+  useEffect(() => {
+    if (!isWeb || !interactive) return;
+    const node = containerRef.current as unknown as HTMLElement | null;
+    if (!node || typeof node.addEventListener !== 'function') return;
+    const onWheel = (event: WheelEvent): void => {
+      event.preventDefault();
+      const rect = node.getBoundingClientRect();
+      const focal = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      const { controller: map, onCameraChange: changed } = live.current;
+      const cam = map.camera;
+      const next = anchored(cam, toLatLng(cam, focal), focal, cam.zoom - event.deltaY * 0.0025);
+      map.applyCamera(next);
+      changed?.(next);
+    };
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => node.removeEventListener('wheel', onWheel);
+  }, [interactive]);
+
   const onLayout = (event: LayoutChangeEvent): void => {
     const { width, height } = event.nativeEvent.layout;
     controller.setSize({ width, height });
@@ -200,6 +223,7 @@ export function BantayMap({
 
   return (
     <View
+      ref={containerRef}
       style={styles.container}
       onLayout={onLayout}
       testID={testID}
