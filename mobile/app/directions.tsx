@@ -12,14 +12,14 @@ import { Colors, Radius, Shadow, Spacing } from '../src/core/theme/colors';
 import { hazardLabelKey } from '../src/core/utils/hazardVisuals';
 import { formatClock, formatDuration } from '../src/core/utils/timeAgo';
 import {
+  GeoBusy,
   RouteOption,
   TravelMode,
   computeRoutes,
   googleMapsDirectionsUrl,
-  isGoogleMapsConfigured,
+  isOnlineGeoAvailable,
   pickSafestRoute,
-} from '../src/data/google/googleMaps';
-import { FreeTierExhausted } from '../src/data/google/freeTier';
+} from '../src/data/geo/geoService';
 import { verifiedHazards } from '../src/data/repositories/logic';
 import { useApp } from '../src/state/appStore';
 import { useUserLocation } from '../src/state/LocationProvider';
@@ -31,10 +31,11 @@ type Result =
 /**
  * Route preview on real streets.
  *
- * The route comes from Google's Routes API. Bantay asks for every alternative
- * and shows the one that passes the fewest verified hazards; when all of them
- * pass one, the hazards are listed rather than hidden. Turn-by-turn guidance
- * is handed to the Google Maps app, which does it properly.
+ * The route comes from OpenStreetMap routing (through Bantay's `geo`
+ * function). Bantay asks for every alternative and shows the one that passes
+ * the fewest verified hazards; when all of them pass one, the hazards are
+ * listed rather than hidden. Turn-by-turn guidance is handed to the Google
+ * Maps app with a plain link, which does it properly and costs nothing.
  */
 export default function DirectionsScreen(): React.ReactElement {
   const { s, data, settings } = useApp();
@@ -53,10 +54,10 @@ export default function DirectionsScreen(): React.ReactElement {
 
   const hazards = useMemo(() => verifiedHazards(data.reports), [data.reports]);
   const requestKey = `${mode}:${destination.lat},${destination.lng}`;
-  const loading = isGoogleMapsConfigured() && result?.key !== requestKey;
+  const loading = isOnlineGeoAvailable() && result?.key !== requestKey;
 
   useEffect(() => {
-    if (!isGoogleMapsConfigured()) return;
+    if (!isOnlineGeoAvailable()) return;
     const abort = new AbortController();
     computeRoutes(origin, destination, mode, hazards, abort.signal).then(
       (options) => {
@@ -78,8 +79,8 @@ export default function DirectionsScreen(): React.ReactElement {
           key: requestKey,
           ok: false,
           message:
-            error instanceof FreeTierExhausted
-              ? s('freeTierUsedUp')
+            error instanceof GeoBusy
+              ? s('routingBusy')
               : error instanceof Error
                 ? error.message
                 : String(error),
@@ -154,9 +155,7 @@ export default function DirectionsScreen(): React.ReactElement {
           ))}
         </View>
 
-        {!isGoogleMapsConfigured() ? (
-          <Text style={styles.note}>{s('routeNoKey')}</Text>
-        ) : loading ? (
+        {loading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={Colors.brandBlue} />
             <Text style={styles.note}>{s('routeLoading')}</Text>

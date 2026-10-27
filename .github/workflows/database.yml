@@ -1,0 +1,44 @@
+# Checks the shared database's rules whenever they change.
+#
+# Builds a scratch Postgres database from supabase/migrations and runs
+# supabase/tests/rules_test.py: every rule about who may do what - filing,
+# reviewing, roles, zones, broadcasts, the audit log, PSGC and the monthly
+# API caps - exercised as the role a real client would be.
+#
+# Free: it runs only when supabase/ changes, uses the Postgres already on the
+# runner (no container to pull) and takes under a minute.
+
+name: Database rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/seed.sql'
+      - 'supabase/tests/**'
+      - '.github/workflows/database.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rules:
+    name: Rule tests against Postgres
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PGHOST: /var/run/postgresql
+      PGDATABASE: bantay_test
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Start Postgres
+        run: |
+          sudo systemctl start postgresql.service
+          sudo -u postgres createuser --superuser "$USER"
+          echo "PGUSER=$USER" >> "$GITHUB_ENV"
+
+      - name: Build the database from the migrations and run the rule tests
+        run: supabase/tests/run.sh

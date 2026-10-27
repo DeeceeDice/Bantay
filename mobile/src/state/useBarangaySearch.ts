@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { LatLng } from '../core/geo/latLng';
 import {
   barangaySearchText,
-  isGoogleMapsConfigured,
-  searchPlacesOnline,
-} from '../data/google/googleMaps';
+  findArea,
+  isOnlineGeoAvailable,
+} from '../data/geo/geoService';
 import { Barangay } from '../data/models/types';
 import { useApp } from './appStore';
 
@@ -58,11 +58,12 @@ export function useBarangaySearch(query: string): {
 }
 
 /**
- * Where a barangay is on the map, from Google Places. PSGC has names and
- * codes but no coordinates; a new zone needs a centre.
+ * Where a barangay is on the map, from OpenStreetMap (through the `geo`
+ * function). PSGC has names and codes but no coordinates; a new zone needs a
+ * centre.
  *
- * `center` is null when there is no key, no connection or no match - the
- * request can still be filed, and the super admin picks the zone instead.
+ * `center` is null when there is no connection or no match - the request can
+ * still be filed, and the super admin picks the zone instead.
  */
 export function useBarangayCentre(barangay: Barangay | null): {
   center: LatLng | null;
@@ -70,7 +71,7 @@ export function useBarangayCentre(barangay: Barangay | null): {
   locating: boolean;
 } {
   const code = barangay?.code ?? null;
-  const enabled = code !== null && isGoogleMapsConfigured();
+  const enabled = code !== null && isOnlineGeoAvailable();
   const [found, setFound] = useState<{
     code: string;
     center: LatLng | null;
@@ -81,12 +82,12 @@ export function useBarangayCentre(barangay: Barangay | null): {
   useEffect(() => {
     if (!enabled || code === null) return;
     const abort = new AbortController();
-    searchPlacesOnline(text, null, abort.signal).then(
-      (places) =>
+    findArea(text, abort.signal).then(
+      (place) =>
         setFound({
           code,
-          center: places[0]?.location ?? null,
-          address: places[0]?.address ?? null,
+          center: place?.location ?? null,
+          address: place?.address ?? null,
         }),
       () => {
         if (!abort.signal.aborted) setFound({ code, center: null, address: null });

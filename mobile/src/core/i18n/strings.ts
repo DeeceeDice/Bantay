@@ -268,10 +268,6 @@ const COPY = {
   openInGoogleMaps: ['Open in Google Maps', 'Buksan sa Google Maps'],
   routeLoading: ['Finding a route on real streets...', 'Naghahanap ng ruta sa totoong kalye...'],
   routeUnavailable: ['Could not get a route right now.', 'Hindi makakuha ng ruta ngayon.'],
-  routeNoKey: [
-    'Street routing needs a Google Maps key, and none is set up. You can still open the trip in Google Maps.',
-    'Kailangan ng Google Maps key para sa ruta, at wala pang naka-set up. Mabubuksan mo pa rin ang biyahe sa Google Maps.',
-  ],
   routeClear: [
     'No verified hazards along this route.',
     'Walang beripikadong panganib sa rutang ito.',
@@ -286,12 +282,10 @@ const COPY = {
   ],
   routeOpenFailed: ['Could not open Google Maps.', 'Hindi mabuksan ang Google Maps.'],
   routeOnStreets: ['Following real streets', 'Sumusunod sa totoong kalye'],
-  mapRoadmap: ['Map', 'Mapa'],
-  freeTierUsedUp: [
-    "This month's free routing is used up. Open in Google Maps still works.",
-    'Ubos na ang libreng ruta ngayong buwan. Gumagana pa rin ang Buksan sa Google Maps.',
+  routingBusy: [
+    'Routing is busy right now - try again in a minute. Open in Google Maps still works.',
+    'Abala ang ruta ngayon - subukan ulit makalipas ang isang minuto. Gumagana pa rin ang Buksan sa Google Maps.',
   ],
-  mapSatellite: ['Satellite', 'Satellite'],
 
   profile: ['Profile', 'Profile'],
   reportsSubmitted: ['Submitted', 'Naisumite'],
@@ -299,6 +293,15 @@ const COPY = {
   trustScore: ['Trust score', 'Trust score'],
   verificationsDone: ['Verifications', 'Beripikasyon'],
   notificationPreferences: ['Notification preferences', 'Setting ng abiso'],
+  notifyAlerts: ['Alert notifications', 'Abiso ng alerto'],
+  notifyAlertsDesc: [
+    'Show new alerts as phone notifications while Bantay is open or running in the background. Once the app is closed, alerts wait in the Alerts tab.',
+    'Ipakita ang bagong alerto bilang abiso sa telepono habang bukas o tumatakbo sa likod ang Bantay. Kapag sarado ang app, naghihintay ang alerto sa Alerts tab.',
+  ],
+  notifyBlocked: [
+    'Notifications are turned off for Bantay in your phone or browser settings.',
+    'Naka-off ang abiso para sa Bantay sa setting ng iyong telepono o browser.',
+  ],
   alertRadius: ['Alert radius', 'Alert radius'],
   alertRadiusDesc: [
     'How far from you a hazard must be before Bantay alerts you.',

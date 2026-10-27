@@ -3,7 +3,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Badge, Card, EmptyState } from '../src/components/ui';
-import { HazardPhoto } from '../src/components/ui/HazardPhoto';
+import { ReportPhoto } from '../src/components/ui/HazardPhoto';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import { hazardLabelKey, rejectReasonLabelKey, statusColor } from '../src/core/utils/hazardVisuals';
 import { timeAgoCompact } from '../src/core/utils/timeAgo';
@@ -39,7 +39,7 @@ export default function MyReportsScreen(): React.ReactElement {
         >
           <View style={styles.row}>
             <View style={styles.photo}>
-              <HazardPhoto uri={report.photoUri} type={report.type} height={62} radius={10} />
+              <ReportPhoto report={report} height={62} radius={10} />
             </View>
             <View style={styles.body}>
               <Text style={styles.title}>{s(hazardLabelKey(report.type))}</Text>

@@ -317,6 +317,37 @@ async function main() {
     );
   }
 
+  // The app reads reports without their photos and relies on this column to
+  // know there is one; without it every report read fails.
+  if (!missing.includes('reports')) {
+    const { error } = await client.from('reports').select('has_photo').limit(1);
+    if (error && /has_photo/.test(error.message ?? '')) {
+      fail(
+        'column "reports.has_photo" not found',
+        'Apply supabase/migrations/20261027000000_report_photo_flag.sql.',
+      );
+    } else {
+      pass('column "reports.has_photo" exists');
+    }
+  }
+
+  // Place search and routing. The health action needs no sign-in.
+  {
+    const { data, error } = await client.functions.invoke('geo', { body: { action: 'health' } });
+    const parts = ['search', 'barangay', 'drive', 'walk'];
+    if (error) {
+      fail(
+        'Edge Function "geo" did not answer',
+        `${error.message}. Deploy supabase/functions/geo (docs/SUPABASE.md, step 8½).`,
+      );
+    } else if (parts.every((part) => data?.[part]?.ok)) {
+      pass('Edge Function "geo" answers: search, barangay lookup, car and foot routes');
+    } else {
+      const broken = parts.filter((part) => !data?.[part]?.ok);
+      fail(`Edge Function "geo" is up but ${broken.join(', ')} failed`, JSON.stringify(data));
+    }
+  }
+
   // ------------------------------------------------------------------ 4. RLS
   section('4. Row Level Security (anonymous caller)');
 

@@ -55,7 +55,13 @@ Verifying turns the pin red for everyone; rejecting removes it.
 One vote per person, so the counter means something.
 
 **Alerts** — a feed of verified hazards, typhoon warnings and safe-spot
-changes, filterable down to just your saved routes.
+changes, filterable down to just your saved routes. While Bantay is open or
+running in the background, new alerts also arrive as phone notifications
+([docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)).
+
+**Search and directions** — find a place or street, and get real street
+routes by car or on foot; Bantay picks the alternative that passes the fewest
+verified hazards, and hands turn-by-turn to Google Maps with one tap.
 
 **Safe spots** — browsable malls, schools, evacuation centres and covered
 terminals, sorted by distance, with a subscribe toggle for status changes.
@@ -70,7 +76,7 @@ English / Filipino toggle that translates the whole interface.
 
 ---
 
-## Two things worth knowing
+## Things worth knowing
 
 **One database, shared with Bantay Admin.** Accounts, reports, verification,
 alerts and subscriptions live in one Supabase project, so every phone sees the
@@ -86,6 +92,13 @@ no key they still load, as the public basemap. CARTO's free basemaps are meant f
 volume; for a large public release take a CARTO plan or point
 [`tileSource.ts`](mobile/src/components/map/tileSource.ts) at another provider
 (MapTiler, Stadia Maps, Thunderforest) - a one-line change.
+
+**No billable key anywhere.** Place search and routing come from free
+OpenStreetMap services (Photon and OSRM), called through Bantay's own `geo`
+Edge Function ([`supabase/functions/geo`](supabase/functions/geo)), which
+needs a signed-in account and keeps a monthly cap. Nothing in the app or the
+public website can run up a bill; [docs/FREE_TIER.md](docs/FREE_TIER.md) lists
+every service and its free allowance.
 
 ---
 
@@ -111,8 +124,9 @@ See [mobile/README.md](mobile/README.md) for the app and
 
 ```
 mobile/         The Android app (React Native / Expo)
-supabase/       The shared database: migrations, seed, rule tests
-docs/           The shared-database contract and the release guide
+supabase/       The shared database: migrations, seed, rule tests, the geo function
+docs/           The shared-database contract, free tiers, notifications, releasing
+.github/        APK build, web build, database rule tests, keep-database-awake
 ```
 
 ---

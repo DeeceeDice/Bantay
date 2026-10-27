@@ -1,84 +1,74 @@
 # Keeping Bantay free
 
-Everything Bantay uses has a free tier. This page lists every service, what
-is free, what the repository already does to stay inside it, and the few
-switches only the account owner can set. **Do the "You set" items once**;
-after that, nothing can bill.
+Everything Bantay uses has a free tier, and nothing in the app or the public
+website can run up a bill. This page lists every service, what is free, what
+the repository already does to stay inside it, and the few switches only the
+account owner can set.
 
 | Service | Free allowance | Used for |
 | --- | --- | --- |
-| Supabase (Free plan) | 500 MB database, 1 GB file storage, 50,000 monthly active users, 5 GB egress | Accounts, reports, alerts, PSGC |
-| Google Maps Platform | Per SKU per month: 10,000 Essentials calls, 5,000 Pro calls, 100,000 2D map tiles | Place search, street routes, placement-map tiles |
+| Supabase (Free plan) | 500 MB database, 1 GB file storage, 5 GB egress, 50,000 monthly active users, 500,000 Edge Function calls a month | Accounts, reports, alerts, PSGC, the `geo` function |
+| Photon (photon.komoot.io) | Free, fair use | Place search, finding a barangay on the map |
+| FOSSGIS OSRM (routing.openstreetmap.de) | Free, fair use | Street routes by car and on foot |
 | CARTO Voyager basemap | Free for non-commercial use; requests carry the project's CARTO key | The map picture |
 | PSA PSGC API | Free with a token | Barangay list (loaded once into Supabase) |
-| GitHub Actions (private repo) | 2,000 minutes and 500 MB artifact storage a month | The APK build and the web build |
+| GitHub Actions | 2,000 minutes and 500 MB artifact storage a month (private repo) | APK build, web build, database rule tests, keep-alive |
 | GitHub Pages (included in the Pro plan) | Free hosting, 100 GB bandwidth a month (soft limit) | The browser app at deeceedice.github.io/Bantay |
 | GitHub Releases | Free, no storage limit on release files | APK downloads |
 
+Google Maps Platform is **no longer used** - see *Google* below.
+
 ---
 
-## Google Maps Platform
+## Search and routing
 
-Google needs a billing account on the project, but since March 2025 each
-SKU has its own free monthly cap, and nothing is charged below it. Bantay
-uses three SKUs:
+Place search, street routing and barangay lookups go through Bantay's `geo`
+Edge Function (`supabase/functions/geo`), which calls Photon and FOSSGIS
+OSRM. Both are OpenStreetMap services run by volunteers for fair use, so the
+function is built to be a polite caller:
 
-| Call | SKU | Free / month | Bantay stops at |
-| --- | --- | --- | --- |
-| Place search (`places:searchText`, name + address + location) | Places API (New) - Text Search **Pro** | 5,000 | 4,500 |
-| Street route (`computeRoutes`, no traffic, no waypoints) | Routes API - Compute Routes **Essentials** | 10,000 | 9,000 |
-| Map tiles on the pin-placement maps | Map Tiles API - **2D Map Tiles** | 100,000 tiles | 900 map views |
+- Only signed-in accounts can use it, at most 30 requests a minute each.
+- Answers are cached: a search for a day, a route for ten minutes. The app
+  also keeps every answer for the rest of the session and only searches after
+  a pause in typing and at least 3 letters.
+- Every call the cache cannot answer takes a ticket from the database's
+  monthly counter (`claim_api_call`): 30,000 searches and 30,000 routes a
+  month for all phones together. When the month's tickets are gone the
+  function says so and the app falls back to its free paths - the built-in
+  Manila places, and the "Open in Google Maps" link (a plain link, never
+  billed).
+- It identifies itself with a User-Agent naming Bantay, as the services ask.
 
-**Already done in the code**
+This month's usage: `select * from api_usage_this_month();` in the SQL editor
+(or Bantay Admin's usage panel). To change a cap:
+`update api_limits set monthly_limit = ... where api = 'osm_search';`
+(clients cannot change it).
 
-- Every Google call first takes a ticket from the shared database
-  (`claim_api_call`, migration `20260928140000_free_tier_guard.sql`). The
-  counter covers all phones together and stops 10% below the free cap.
-  When it says no - or cannot be reached - the call is not made:
-  - search uses the built-in Manila places and your safe spots,
-  - directions say this month's free routing is used up, and **Open in
-    Google Maps** still works (a plain link, never billed),
-  - placement maps use the CARTO basemap,
-  - a barangay access request is filed without a map centre (the super
-    admin picks the zone).
-- Routes are requested **without traffic** (`TRAFFIC_UNAWARE`) and without
-  waypoints, which keeps them on the Essentials SKU (traffic would move
-  them to Pro, with half the free allowance).
-- A search or route already fetched is reused for the rest of the session
-  instead of paid for again; search waits for a pause in typing and at
-  least 3 letters.
-- This month's usage: `select * from api_usage_this_month();` in the SQL
-  editor (or `rpc('api_usage_this_month')` from either app).
-- To change a limit: `update api_limits set monthly_limit = ... where api = '...';`
-  in the SQL editor (clients cannot change it).
+**A large public release** should not lean on volunteer servers: self-host
+OSRM and Photon (both are open source), or take a paid plan from a provider
+such as Stadia Maps or GraphHopper. Only the function changes; no app release.
 
-**You set (Google Cloud console, project that owns the key)**
+---
 
-1. **APIs & Services -> Credentials -> the key -> API restrictions ->
-   Restrict key** to exactly: *Places API (New)*, *Routes API*, *Map Tiles
-   API*. Nothing else can then be billed through this key.
-2. **Application restrictions -> Android apps**: package
-   `com.deeceedice.bantay` plus the SHA-1 of the signing certificate (the
-   APK workflow's debug keystore). Other apps then cannot use the key.
-   (Skip this while testing in Expo Go, which is a different app.)
-3. **The hard stop - per-day quotas.** *IAM & Admin -> Quotas & System
-   Limits*, filter by each API, edit the *per day* request limit:
+## Google
 
-   | API | Quota | Set to |
-   | --- | --- | --- |
-   | Places API (New) | Text Search requests per day | **150** |
-   | Routes API | Compute Routes requests per day | **300** |
-   | Map Tiles API | 2D tile requests per day | **3,000** |
+Bantay used Google's Places, Routes and Map Tiles APIs until October 2026.
+They are gone from the app and the website, because:
 
-   30 days at those limits stays under every free cap, and Google refuses
-   the call - it does not bill it - once a day's quota is used. This is the
-   one guarantee nothing on a phone can get around.
-4. **Billing -> Budgets & alerts**: a budget of the smallest amount
-   (e.g. 1 USD/PHP 50) with alerts at 50%, 90%, 100%. A budget only emails,
-   it does not stop anything - step 3 is what stops spending.
-5. Do **not** enable other Maps APIs on the project, and do not turn on
-   traffic, waypoints or extra Places fields in the code without updating
-   the table above.
+- the key had to ship inside the app and the public site, where anyone could
+  copy it and bill the project's Google account directly; and
+- Google's terms do not allow Places or Routes results on a non-Google map,
+  and Bantay draws its own OpenStreetMap map.
+
+Copies of the app installed before the change still ask the database for a
+ticket before each Google call, and the Google allowances are now 0
+(migration `20261027000100_osm_geo_limits.sql`), so they are refused and use
+their free fallbacks instead.
+
+**You set:** the old key (`AIzaSyDh...`) is still in published APKs and in
+git history. In Google Cloud, **APIs & Services -> Credentials**, **delete
+it** (or at least restrict it to nothing). If the Google Cloud project has a
+billing account only for Bantay, you can close that too.
 
 ---
 
@@ -86,30 +76,45 @@ uses three SKUs:
 
 The site at https://deeceedice.github.io/Bantay/ is public, and everything a
 browser runs can be read by anyone who opens it - including the keys in
-`mobile/app.json`:
+`mobile/app.json`. Both are safe to be public:
 
 - The **Supabase anon key** is meant to be public; Row Level Security
-  decides what it can do.
+  decides what it can do, and the `geo` function only serves signed-in
+  accounts within their limits.
 - The **CARTO key** only reads public map tiles.
-- The **Google Maps key** is the one that matters. The app's monthly ticket
-  counter keeps honest use inside the free tier, but someone could copy the
-  key out of the site and call Google directly. The per-day quotas and API
-  restrictions under *Google Maps Platform -> You set* above are what make
-  that impossible to bill. Set them.
 
 ---
 
 ## Supabase
 
-**Already done:** the database is about 20 MB of the 500 MB allowance
-(PSGC is 8.6 MB), no files are stored (report photos are small inline
-images), and the free-tier counter above is two small tables.
+**Already done**
+
+- **Photos do not travel with lists.** A report's photo is a ~100 KB image
+  inside its row. The apps read reports without it (the generated `has_photo`
+  column says whether there is one) and fetch a photo only when someone opens
+  that report, once per session. Bantay Admin's safe-spot photos are not
+  downloaded by the app at all.
+- **Live updates read one row, not everything.** When another phone changes
+  something, realtime says which report, and the app re-reads just that
+  report and its votes (or just the safe-spot list, or just your alerts),
+  gathering a burst of changes into one read. Before this, every vote on
+  every phone made every open copy of the app reload every report.
+- **The project stays awake.** A Free project pauses after 7 days without
+  requests, which locks everyone out until someone restores it. The **Keep
+  database awake** workflow (`.github/workflows/keep-alive.yml`) reads one row
+  every second day.
+- The database is about 21 MB of the 500 MB allowance (PSGC is 8.6 MB). At
+  about 100 KB a photo, roughly 4,500 photo reports fill the rest; before
+  that, move photos to Storage (mobile/docs/SUPABASE.md, step 9).
+- The `geo` function's calls (one per uncached search or route) are a tiny
+  part of the 500,000 free Edge Function calls a month.
 
 **You set:** keep the organisation on the **Free plan** (Dashboard ->
 Organization -> Billing). The Free plan has no overage charges: at a limit,
 Supabase restricts the project instead of billing. If the organisation is
-ever moved to Pro, turn the **Spend Cap** on. A Free project pauses after
-a week with no requests; opening the app or the dashboard wakes it.
+ever moved to Pro, turn the **Spend Cap** on. The Free plan also allows only
+two active projects per organisation; a third has to be paused (as JDM-usec
+was) for Bantay to run.
 
 ---
 
@@ -117,16 +122,19 @@ a week with no requests; opening the app or the dashboard wakes it.
 
 **Already done**
 
-- Two workflows: the APK build (it typechecks, lints and tests before
-  building) and the web build (tests, then a couple of minutes to export and
-  publish to GitHub Pages). The separate CI workflow was removed. The APK
-  artifact is kept for 1 day (the Release keeps the APK for good, and
-  release files are free); the Pages artifact is also kept for 1 day.
+- Four workflows, each only when it has work:
+  - **Android APK** - typechecks, lints and tests, then builds and publishes
+    the APK, on pushes that change the app. Caches Gradle, skips test- and
+    docs-only pushes, 45-minute timeout. The APK artifact is kept 1 day (the
+    Release keeps the APK for good, and release files are free).
+  - **Web app** - tests, exports and publishes to Pages, on pushes that
+    change the app. A couple of minutes; the Pages artifact is kept 1 day.
+  - **Database rules** - builds a scratch Postgres from the migrations and
+    runs the rule tests, only when `supabase/` changes. Under a minute, using
+    the Postgres already on the runner.
+  - **Keep database awake** - a few seconds every second day.
 - 87 old artifacts (2.2 GB, mostly from the earlier Flutter builds) were
   deleted - the account was far over the 500 MB free storage.
-- The APK build caches Gradle between runs, skips pushes that only change
-  tests or docs, and has a 45-minute timeout, so a stuck build cannot eat
-  the month's minutes.
 
 **You set:** *github.com -> Settings -> Billing and plans -> Spending
 limits*: keep Actions (and Packages) at **0 USD**. With a 0 limit GitHub

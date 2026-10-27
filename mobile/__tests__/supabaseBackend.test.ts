@@ -3,6 +3,7 @@ import { HazardReport } from '../src/data/models/types';
 import {
   createSupabaseAuth,
   createSupabaseBackend,
+  toDataChange,
 } from '../src/data/repositories/supabaseBackend';
 
 /**
@@ -20,6 +21,8 @@ interface FakeState {
   signUpResponse: { data: unknown; error: unknown };
   signInResponse: { data: unknown; error: unknown };
   writes: { table: string; op: string; row: Row }[];
+  /** Every column list asked for, by table. */
+  selects: { table: string; columns: string }[];
 }
 
 const state: FakeState = {
@@ -29,6 +32,7 @@ const state: FakeState = {
   signUpResponse: { data: null, error: null },
   signInResponse: { data: null, error: null },
   writes: [],
+  selects: [],
 };
 
 function query(table: string) {
@@ -66,7 +70,7 @@ function query(table: string) {
   };
 
   const builder = {
-    select: () => builder,
+    select: (columns = '*') => (state.selects.push({ table, columns }), builder),
     insert: (row: Row) => ((op = 'insert'), (payload = row), builder),
     update: (row: Row) => ((op = 'update'), (payload = row), builder),
     upsert: (row: Row, opts?: { ignoreDuplicates?: boolean }) => (
@@ -160,6 +164,7 @@ const report = (overrides: Partial<HazardReport> = {}): HazardReport => ({
   reporterName: 'Maria',
   description: '',
   photoUri: null,
+  hasPhoto: false,
   confirmCount: 0,
   denyCount: 0,
   flagCount: 0,
@@ -184,6 +189,7 @@ beforeEach(() => {
   state.userId = null;
   state.canVerify = false;
   state.writes = [];
+  state.selects = [];
 });
 
 describe('SupabaseAuth.signUp', () => {
@@ -504,5 +510,93 @@ describe('SupabaseBackend.upsertReport', () => {
       createSupabaseBackend().upsertReport(report({ status: 'verified', verifiedBy: 'Me' })),
     ).rejects.toThrow(/Only officials can review/)
     expect(state.tables.reports[0].status).toBe('pending');
+  });
+});
+
+describe('reading reports without their photos', () => {
+  const stored = (): Row => ({
+    id: 'report-1',
+    type: 'landslide',
+    severity: 'life_threatening',
+    status: 'verified',
+    lat: 14.6,
+    lng: 120.99,
+    address_label: 'Lacson Ave',
+    reported_at: '2026-10-26T10:00:00Z',
+    reporter_id: 'someone-else',
+    reporter_name: 'Maria',
+    description: '',
+    photo_uri: 'data:image/jpeg;base64,AAAA',
+    has_photo: true,
+    verified_by: 'Kgd. Cruz',
+    verified_at: '2026-10-26T10:05:00Z',
+  });
+
+  it('never asks for photo columns when loading everything', async () => {
+    state.userId = USER;
+    await createSupabaseBackend().loadAll();
+    const reportCols = state.selects.find((q) => q.table === 'reports')?.columns ?? '';
+    const spotCols = state.selects.find((q) => q.table === 'safe_spots')?.columns ?? '';
+    expect(reportCols).not.toMatch(/\*|photo_uri/);
+    expect(reportCols).toMatch(/has_photo/);
+    expect(spotCols).not.toMatch(/\*|photo_url/);
+  });
+
+  it('reads one report with its votes and flags', async () => {
+    state.tables.reports = [stored()];
+    state.tables.report_votes = [
+      { report_id: 'report-1', user_id: 'a', confirms: true },
+      { report_id: 'report-1', user_id: 'b', confirms: false },
+      { report_id: 'other', user_id: 'c', confirms: true },
+    ];
+    state.tables.report_flags = [{ report_id: 'report-1', user_id: 'a' }];
+    const found = await createSupabaseBackend().loadReport('report-1');
+    expect(found).toMatchObject({
+      id: 'report-1',
+      status: 'verified',
+      hasPhoto: true,
+      confirmCount: 1,
+      denyCount: 1,
+      flagCount: 1,
+      votedUserIds: ['a', 'b'],
+    });
+    expect(state.selects.find((q) => q.table === 'reports')?.columns).not.toMatch(/photo_uri/);
+  });
+
+  it('says a report is gone rather than throwing', async () => {
+    expect(await createSupabaseBackend().loadReport('missing')).toBeNull();
+  });
+
+  it('fetches a single photo on demand', async () => {
+    state.tables.reports = [stored()];
+    expect(await createSupabaseBackend().loadReportPhoto('report-1')).toBe('data:image/jpeg;base64,AAAA');
+    expect(state.selects).toEqual([{ table: 'reports', columns: 'photo_uri' }]);
+  });
+});
+
+describe('toDataChange', () => {
+  it('names the report a change is about, including deletions', () => {
+    expect(toDataChange('reports', { eventType: 'UPDATE', new: { id: 'r1' }, old: {} })).toEqual({
+      table: 'reports',
+      reportId: 'r1',
+      deleted: false,
+    });
+    expect(toDataChange('reports', { eventType: 'DELETE', new: {}, old: { id: 'r1' } })).toEqual({
+      table: 'reports',
+      reportId: 'r1',
+      deleted: true,
+    });
+    expect(
+      toDataChange('report_votes', { eventType: 'DELETE', new: {}, old: { report_id: 'r2', user_id: 'u' } }),
+    ).toEqual({ table: 'report_votes', reportId: 'r2' });
+  });
+
+  it('ignores an event it cannot place', () => {
+    expect(toDataChange('reports', { eventType: 'DELETE', new: {}, old: {} })).toBeNull();
+  });
+
+  it('passes alerts and safe spots on as a whole', () => {
+    expect(toDataChange('alerts', { eventType: 'INSERT', new: { id: 'a' }, old: {} })).toEqual({ table: 'alerts' });
+    expect(toDataChange('safe_spots', { eventType: 'UPDATE', new: { id: 's' }, old: {} })).toEqual({ table: 'safe_spots' });
   });
 });

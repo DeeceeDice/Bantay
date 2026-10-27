@@ -5,11 +5,13 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import { LatLng } from '../core/geo/latLng';
 import { Language, Translate, translator } from '../core/i18n/strings';
+import { appInBackground, showAlertNotification } from '../core/platform/notifications';
 import { MapLayer, RejectReason, SelfServiceRole } from '../data/models/enums';
 import {
   AlertItem,
@@ -24,23 +26,27 @@ import {
   AccessRequestInput,
   BantayAuth,
   BantayBackend,
+  DataChange,
   Snapshot,
   emptySnapshot,
 } from '../data/repositories/backend';
+import { mergeReports, planChanges } from '../data/repositories/changes';
 import { applyFlag, applyVote, routeContaining } from '../data/repositories/logic';
 import { StoreKeys } from '../data/repositories/storeKeys';
 import { createSupabaseAuth, createSupabaseBackend } from '../data/repositories/supabaseBackend';
 
 /*
- * Only settings that change something. There is no push-notification or SMS
- * delivery behind Bantay, so there are no switches pretending to control
- * them: alerts arrive in the app, live, while it is open.
+ * Only settings that change something. Alerts arrive live while Bantay is
+ * running; `notifyAlerts` also shows them as system notifications while it
+ * is running in the background. There is no push or SMS delivery to a phone
+ * whose app is closed, so there is no switch pretending to control one.
  */
 export interface Settings {
   language: Language;
   alertRadiusKm: number;
   locationGranted: boolean;
   layers: MapLayer[];
+  notifyAlerts: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -48,7 +54,11 @@ const DEFAULT_SETTINGS: Settings = {
   alertRadiusKm: 2,
   locationGranted: false,
   layers: ['verified_hazards', 'pending_reports', 'safe_spots'],
+  notifyAlerts: true,
 };
+
+/** At most this many notifications for one burst of new alerts. */
+const MAX_NOTIFICATIONS_AT_ONCE = 3;
 
 export interface AppState {
   ready: boolean;
@@ -97,6 +107,8 @@ export interface AppActions {
   flagReport(reportId: string): Promise<void>;
   verifyReport(reportId: string): Promise<void>;
   rejectReport(reportId: string, reason: RejectReason, note: string): Promise<void>;
+  /** One report's photo, read from the database. Use `useReportPhoto`, which caches it. */
+  loadReportPhoto(reportId: string): Promise<string | null>;
 
   // Routes
   addRoute(input: {
@@ -124,6 +136,9 @@ export interface AppActions {
   refresh(): Promise<void>;
 }
 
+/** How long realtime events are gathered before being applied together. */
+const CHANGE_BATCH_MS = 400;
+
 const SUSPENDED_MESSAGE =
   'Your account is suspended. You can still see the map, but you cannot report, confirm or flag hazards until a super admin reinstates it.';
 
@@ -149,6 +164,16 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   const [user, setUser] = useState<UserProfile | null>(null);
   const [data, setData] = useState<Snapshot>(emptySnapshot());
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+  // Read from realtime callbacks, which outlive any one render.
+  const notifyRef = useRef(DEFAULT_SETTINGS.notifyAlerts);
+  const knownAlertIds = useRef(new Set<string>());
+  useEffect(() => {
+    notifyRef.current = settings.notifyAlerts;
+  }, [settings.notifyAlerts]);
+  useEffect(() => {
+    data.alerts.forEach((a) => knownAlertIds.current.add(a.id));
+  }, [data.alerts]);
 
   /**
    * The profile is re-read rather than updated in place: its role, zone,
@@ -181,6 +206,57 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     }
   }, [reload]);
 
+  /**
+   * Shows alerts that just arrived as system notifications - only when the
+   * person allows it and Bantay is not on screen (on screen, the Alerts tab's
+   * badge says it), and only alerts this device has not seen before.
+   */
+  const notifyNewAlerts = useCallback((alerts: readonly AlertItem[]) => {
+    const fresh = alerts.filter((a) => !a.isRead && !knownAlertIds.current.has(a.id));
+    fresh.forEach((a) => knownAlertIds.current.add(a.id));
+    if (!notifyRef.current || !appInBackground()) return;
+    fresh.slice(0, MAX_NOTIFICATIONS_AT_ONCE).forEach((a) => {
+      void showAlertNotification(a).catch(() => {
+        // No permission, or the platform cannot show one: the Alerts tab has it.
+      });
+    });
+  }, []);
+
+  /**
+   * Brings the app up to date with a burst of realtime events by reading
+   * again only the rows they name - one report and its votes, the safe-spot
+   * list, or this person's alerts - instead of the whole snapshot.
+   */
+  const applyChanges = useCallback(
+    async (changes: readonly DataChange[]) => {
+      const plan = planChanges(changes);
+      if (plan.reloadAll) {
+        await reload();
+        return;
+      }
+
+      const [fresh, safeSpots, personal] = await Promise.all([
+        Promise.all(
+          plan.reportIds.map(async (id) => [id, await backend.loadReport(id)] as const),
+        ),
+        plan.safeSpots ? backend.loadSafeSpots() : Promise.resolve(null),
+        plan.personal ? backend.loadPersonal() : Promise.resolve(null),
+      ]);
+
+      if (personal) notifyNewAlerts(personal.alerts);
+      setData((prev) => ({
+        ...prev,
+        ...(personal ?? {}),
+        safeSpots: safeSpots ?? prev.safeSpots,
+        reports: mergeReports(prev.reports, new Map(fresh), plan.deletedReportIds),
+      }));
+      // A review, an approval or a role change reaches this person as an
+      // alert, and changes their profile's statistics, role or zone too.
+      if (plan.personal) await refreshUser();
+    },
+    [backend, reload, refreshUser, notifyNewAlerts],
+  );
+
   useEffect(() => {
     let cancelled = false;
 
@@ -199,9 +275,24 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       setReady(true);
     })();
 
-    // Realtime pushes other devices' changes straight in.
-    const unsubscribe = backend.subscribe(() => {
-      void reload();
+    // Realtime pushes other devices' changes straight in. Events come in
+    // bursts - a review writes the report, an alert and statistics at once -
+    // so they are gathered for a moment and applied together.
+    let queued: DataChange[] = [];
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const flush = async (): Promise<void> => {
+      timer = null;
+      const batch = queued;
+      queued = [];
+      try {
+        await applyChanges(batch);
+      } catch {
+        // The next event or a pull-to-refresh tries again.
+      }
+    };
+    const unsubscribe = backend.subscribe((change) => {
+      queued.push(change);
+      timer ??= setTimeout(() => void flush(), CHANGE_BATCH_MS);
     });
 
     // A session that ends on its own - revoked, expired, account deleted -
@@ -215,10 +306,11 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
 
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
       unsubscribe();
       stopWatchingSession();
     };
-  }, [backend, auth, reload]);
+  }, [backend, auth, applyChanges]);
 
   const pushAlert = useCallback(
     async (alert: AlertItem) => {
@@ -332,6 +424,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
         reporterName: user.name,
         description: input.description,
         photoUri: input.photoUri,
+        hasPhoto: input.photoUri !== null,
         confirmCount: 0,
         denyCount: 0,
         flagCount: 0,
@@ -431,6 +524,11 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       await reloadForUser();
     },
     [data.reports, user, replaceReport, reloadForUser],
+  );
+
+  const loadReportPhoto: AppActions['loadReportPhoto'] = useCallback(
+    (reportId) => backend.loadReportPhoto(reportId),
+    [backend],
   );
 
   // --- Routes -----------------------------------------------------------
@@ -575,6 +673,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       flagReport,
       verifyReport,
       rejectReport,
+      loadReportPhoto,
       addRoute,
       deleteRoute,
       restoreRoute,
@@ -589,7 +688,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     [
       ready, user, data, settings, signUp, logIn, selectRole, requestAccess, searchBarangays,
       setHomeZone, logOut,
-      submitReport, voteOnReport, flagReport, verifyReport, rejectReport,
+      submitReport, voteOnReport, flagReport, verifyReport, rejectReport, loadReportPhoto,
       addRoute, deleteRoute, restoreRoute, markAlertRead, markAllAlertsRead,
       toggleSubscription, updateSettings, toggleLayer, setVerifiedOnly, reload,
     ],
@@ -618,6 +717,7 @@ async function loadSettings(): Promise<Settings> {
       alertRadiusKm: parsed.alertRadiusKm ?? DEFAULT_SETTINGS.alertRadiusKm,
       locationGranted: parsed.locationGranted ?? DEFAULT_SETTINGS.locationGranted,
       layers: parsed.layers ?? DEFAULT_SETTINGS.layers,
+      notifyAlerts: parsed.notifyAlerts ?? DEFAULT_SETTINGS.notifyAlerts,
     };
   } catch {
     return DEFAULT_SETTINGS;

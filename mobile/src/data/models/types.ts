@@ -32,8 +32,15 @@ export interface HazardReport {
   reporterId: string;
   reporterName: string;
   description: string;
-  /** Local file URI, remote URL, or a `seed:` key for bundled sample scenes. */
+  /**
+   * A data URI, a URL, or a `seed:` key for bundled sample scenes. Null for a
+   * report read from the database even when it has a photo: photos are
+   * fetched one at a time, when shown (`useReportPhoto`), so a list of
+   * reports is not a download of every photo in it.
+   */
   photoUri: string | null;
+  /** Whether there is a photo to fetch when `photoUri` is null. */
+  hasPhoto: boolean;
   confirmCount: number;
   denyCount: number;
   flagCount: number;

@@ -10,7 +10,7 @@ import { AppBar, Badge, Button, Card, EmptyState, SegmentedButton } from '../src
 import { HazardPin } from '../src/components/ui/Pins';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { Sheet } from '../src/components/ui/Sheet';
-import { HazardPhoto } from '../src/components/ui/HazardPhoto';
+import { ReportPhoto } from '../src/components/ui/HazardPhoto';
 import { Geo } from '../src/core/geo/latLng';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import {
@@ -101,7 +101,7 @@ export default function VerificationScreen(): React.ReactElement {
     <Card key={report.id} padded={false} style={styles.card}>
       <View style={styles.cardTop}>
         <View style={styles.photo}>
-          <HazardPhoto uri={report.photoUri} type={report.type} height={74} radius={10} />
+          <ReportPhoto report={report} height={74} radius={10} />
         </View>
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle}>{s(hazardLabelKey(report.type))}</Text>

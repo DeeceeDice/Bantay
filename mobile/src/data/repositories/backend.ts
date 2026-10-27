@@ -23,6 +23,19 @@ export interface Snapshot {
   accessRequests: AccessRequest[];
 }
 
+/** The parts of a snapshot that belong to the signed-in person. */
+export type PersonalData = Pick<Snapshot, 'alerts' | 'subscribedSpotIds' | 'zones' | 'accessRequests'>;
+
+/**
+ * One row another device (or the database) changed, as realtime reports it.
+ * The store re-reads just that row, or that small part of the snapshot.
+ */
+export type DataChange =
+  | { table: 'reports'; reportId: string; deleted: boolean }
+  | { table: 'report_votes'; reportId: string }
+  | { table: 'alerts' }
+  | { table: 'safe_spots' };
+
 export const emptySnapshot = (): Snapshot => ({
   reports: [],
   safeSpots: [],
@@ -68,7 +81,15 @@ export interface AccessRequestInput {
  * the interface exists so the store can be tested against a fake client.
  */
 export interface BantayBackend {
+  /** Everything, without report photos (see `loadReportPhoto`). */
   loadAll(): Promise<Snapshot>;
+  /** One report with its votes and flags, or null if it is gone or hidden. */
+  loadReport(reportId: string): Promise<HazardReport | null>;
+  /** One report's photo, fetched only when someone looks at it. */
+  loadReportPhoto(reportId: string): Promise<string | null>;
+  loadSafeSpots(): Promise<SafeSpot[]>;
+  /** Alerts, subscriptions, zones and access requests. */
+  loadPersonal(): Promise<PersonalData>;
 
   upsertReport(report: HazardReport): Promise<void>;
   upsertRoute(route: SavedRoute): Promise<void>;
@@ -82,10 +103,10 @@ export interface BantayBackend {
   searchBarangays(query: string): Promise<Barangay[]>;
 
   /**
-   * Notifies when another device changes shared data. Returns an unsubscribe
-   * function.
+   * Notifies when another device changes shared data, one row at a time.
+   * Returns an unsubscribe function.
    */
-  subscribe(onChange: () => void): () => void;
+  subscribe(onChange: (change: DataChange) => void): () => void;
 }
 
 export interface AuthResult {

@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BantayMap, MapCircle, MapMarker } from '../../src/components/map/BantayMap';
 import { useMapController } from '../../src/components/map/useMapController';
 import { Badge, Button, StatusBanner } from '../../src/components/ui';
-import { HazardPhoto } from '../../src/components/ui/HazardPhoto';
+import { ReportPhoto } from '../../src/components/ui/HazardPhoto';
 import {
   HazardPin,
   PlacementPin,
@@ -114,7 +114,7 @@ export default function MapScreen(): React.ReactElement {
     setChecking(false);
   }, [data.reports, userPoint, settings.alertRadiusKm]);
 
-  // Google's results first when there are any; the built-in gazetteer fills
+  // Online (OpenStreetMap) results first when there are any; the built-in gazetteer fills
   // in (and is all there is offline), then the user's safe spots.
   const suggestions = useMemo(() => {
     if (query.trim().length === 0) return [];
@@ -484,7 +484,7 @@ export default function MapScreen(): React.ReactElement {
             </View>
 
             <View style={styles.photoBox}>
-              <HazardPhoto uri={selectedReport.photoUri} type={selectedReport.type} height={170} />
+              <ReportPhoto report={selectedReport} height={170} />
             </View>
 
             {selectedReport.description.length > 0 && (

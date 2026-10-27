@@ -39,7 +39,7 @@ approves, and the database - not either app - decides who may review, manage
 safe spots or broadcast, and in which zone. A barangay official names their
 barangay from the PSA's official list (PSGC, all 42,010 barangays, loaded into
 the database); if Bantay has no zone there yet, approval creates one where
-Google Places finds it. What the two apps share, and how
+OpenStreetMap finds it. What the two apps share, and how
 the console's vocabulary maps onto it, is in
 **[docs/SHARED_DATABASE.md](../docs/SHARED_DATABASE.md)**.
 
@@ -66,21 +66,24 @@ turns the pin red for everyone.
 so the counter means something.
 
 **Alerts** — verified hazards, typhoon warnings and safe-spot changes,
-filterable down to just your saved routes.
+filterable down to just your saved routes. While Bantay is open or running in
+the background, a new alert also shows as a phone (or browser) notification;
+see [docs/NOTIFICATIONS.md](../docs/NOTIFICATIONS.md) for what that covers and
+what real push would need.
 
 **Safe spots** — malls, schools, evacuation centres and covered terminals,
 nearest first, with a subscribe toggle.
 
-**Search** — type a place, street or business and Google Places finds it,
-biased to where you are; a built-in list of Manila landmarks and your safe
-spots answer too, and are all there is offline. Pick a result to drop a pin
-and get directions to it.
+**Search** — type a place, street or business and OpenStreetMap search
+(Photon) finds it, biased to where you are; a built-in list of Manila
+landmarks and your safe spots answer too, and are all there is offline. Pick
+a result to drop a pin and get directions to it.
 
-**Directions** — real street routes from Google's Routes API, by car or on
-foot. Bantay asks for every alternative Google offers and shows the one that
-passes the fewest (and least severe) verified hazards; if every option passes
-one, the hazards are named rather than hidden. Turn-by-turn is handed to the
-Google Maps app with one tap.
+**Directions** — real street routes from OpenStreetMap routing (OSRM), by car
+or on foot. Bantay asks for every alternative and shows the one that passes
+the fewest (and least severe) verified hazards; if every option passes one,
+the hazards are named rather than hidden. Turn-by-turn is handed to the
+Google Maps app with one tap - a plain link, no key, never billed.
 
 **Saved routes** — the route you tap out is snapped to real streets, and its
 live "Clear" / "2 hazards" badge is measured against that street path, not
@@ -112,41 +115,32 @@ moderate volume; for a large public release take a CARTO plan or point
 `src/components/map/tileSource.ts` at MapTiler, Stadia or Thunderforest — a
 one-line change.
 
-### Google Maps Platform: search and routing only
+### Search and routing: OpenStreetMap, through the `geo` function
 
-**Stays free:** every Google call takes a ticket from a shared monthly
-counter in the database that stops 10% under Google's free allowance, and
-falls back to something free when it runs out. The settings only the
-account owner can make (per-day quotas on the Google project, key
-restrictions, 0 USD spending limits) are in
-**[docs/FREE_TIER.md](../docs/FREE_TIER.md)**.
+Place search, street routing and finding a barangay on the map go through
+Bantay's own Edge Function, `supabase/functions/geo` (client:
+`src/data/geo/geoService.ts`), which asks free OpenStreetMap services:
+**Photon** for places (Nominatim as a fallback) and **FOSSGIS OSRM** for car
+and foot routes (the OSRM demo server as a fallback for car).
 
-Search and street routing call Google's **Places API (New)** and **Routes
-API** over plain HTTPS (`src/data/google/googleMaps.ts`). The key is read from
-`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`, else `app.json` →
-`expo.extra.googleMaps.apiKey`, where a demo key is already set.
+- **No key in the app or the website.** Nothing billable ships in either.
+  (These used to be Google's Places and Routes APIs, with a key anyone could
+  read out of the public site.)
+- **Allowed on Bantay's map.** OpenStreetMap results may be drawn on any
+  map; Google's terms do not allow Places or Routes results on a non-Google
+  map, which is why Google is no longer used for them.
+- **Polite and capped.** The function needs a signed-in account, allows 30
+  requests a minute per account, caches answers (searches a day, routes ten
+  minutes), and takes a ticket from the database's monthly counter
+  (`osm_search`, `osm_route`: 30,000 each). The services are run by
+  volunteers for fair use; a large public release should self-host OSRM or
+  take a paid plan, which changes only the function.
+- **No route, no fake route.** Offline or refused, search falls back to the
+  built-in gazetteer and the directions screen says routing is unavailable,
+  with the hand-off to the Google Maps app still working.
 
-- **Restrict the key before sharing a build.** Limit it to *Places API
-  (New)*, *Routes API* and *Map Tiles API* and set per-day quotas, as in
-  [docs/FREE_TIER.md](../docs/FREE_TIER.md). A key shipped in an app can be
-  read out of it, so the restriction and the quotas protect the billing
-  account.
-- **Google tiles where you place a pin.** The report pin and new-route maps
-  ask the **Map Tiles API** for a session (`src/data/google/googleTiles.ts`)
-  and, if Google grants one, draw Google's roadmap with a Map / Satellite
-  switch. If it refuses, they keep the CARTO basemap and show no switch.
-  **The demo key currently refuses** (`403 ... are blocked`): in Google
-  Cloud, enable *Map Tiles API* for the project and add it to the key's
-  allowed APIs. No app change or rebuild is needed after that.
-- **Demo only, as it stands.** Google's terms do not allow Places or Routes
-  results to be shown on a non-Google map, and the main map and directions
-  still use CARTO. That is fine for a private demo; before a public release,
-  draw those with Google tiles too (and show Google's full attribution from
-  the tiles viewport call) or swap search and routing for OpenStreetMap-based
-  services.
-- **No key, no fake route.** Without one, search falls back to the built-in
-  gazetteer and the directions screen says routing is unavailable, with the
-  hand-off to the Google Maps app still working.
+Check the function from the dashboard (**Edge Functions → geo → Test**, body
+`{"action":"health"}`) or see [docs/SUPABASE.md](docs/SUPABASE.md).
 
 ---
 
@@ -169,14 +163,14 @@ src/
     map/                The map component, controller and tile source
     ui/                 Buttons, badges, cards, pins, sheets
   data/
-    google/             Places search and Routes API client
+    geo/                Place search and routing client (the geo function)
     models/             Domain types and enums
     repositories/       Backend seam, local + Supabase, pure domain logic
     seed/               Sample Manila data and the offline gazetteer
   state/                App store, location provider
 scripts/                check-supabase.mjs, the connection check
 docs/SUPABASE.md        Step-by-step backend setup
-__tests__/              123 tests
+__tests__/              134 tests
 ```
 
 The SQL is not in here. It lives in `supabase/` at the **repository root**,
@@ -186,8 +180,10 @@ owns:
 ```
 supabase/config.toml    marks the repo as a Supabase project
 supabase/migrations/    tables, RLS policies, trigger, realtime
+supabase/functions/geo/ place search and routing (Edge Function)
 supabase/seed.sql       sample spots and hazards
 supabase/scripts/       psgc_to_sql.py, loads the PSGC barangay list
+supabase/tests/         the database rule tests (run.sh)
 ```
 
 ---
@@ -197,7 +193,7 @@ supabase/scripts/       psgc_to_sql.py, loads the PSGC barangay list
 ```bash
 npm run typecheck        # tsc, strict
 npm run lint             # eslint, including the React Compiler rules
-npm test                 # 123 tests
+npm test                 # 134 tests
 npm run check:supabase   # verifies the database connection, schema and RLS
 ```
 
@@ -207,8 +203,9 @@ says so and exits rather than pretending to pass.
 Tests cover the Mercator projection and camera maths, geographic distance
 including point-to-path, the verification loop, one-vote-per-user enforcement,
 area-scoped moderation, safety checks, route hazard matching, trust-score
-bounds, and the Google client: polyline decoding, path simplification and
-safest-route choice.
+bounds, applying realtime changes row by row, reading reports without their
+photos, and the geo client: polyline decoding (against a real OSRM route),
+path simplification and safest-route choice.
 
 ---
 

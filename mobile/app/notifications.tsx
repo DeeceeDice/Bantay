@@ -1,15 +1,19 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Badge, Card, NavRow, SectionHeader } from '../src/components/ui';
 import { Sheet } from '../src/components/ui/Sheet';
 import { Geo } from '../src/core/geo/latLng';
+import { notificationPermission, prepareNotifications } from '../src/core/platform/notifications';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import { useApp } from '../src/state/appStore';
 
-/** Which area's broadcasts reach you, and how close a hazard must be to alert you. */
+/**
+ * Whether new alerts show as system notifications, which area's broadcasts
+ * reach you, and how close a hazard must be to alert you.
+ */
 export default function NotificationsScreen(): React.ReactElement {
   const app = useApp();
   const { s, user, data, settings } = app;
@@ -19,6 +23,17 @@ export default function NotificationsScreen(): React.ReactElement {
   const radiusKm = draggedKm ?? settings.alertRadiusKm;
 
   const homeZone = data.zones.find((z) => z.id === user?.homeZoneId) ?? null;
+
+  const toggleNotifications = async (on: boolean): Promise<void> => {
+    if (on) {
+      await prepareNotifications();
+      if (!(await notificationPermission(true))) {
+        Alert.alert(s('notifyAlerts'), s('notifyBlocked'));
+        return;
+      }
+    }
+    await app.updateSettings({ notifyAlerts: on });
+  };
 
   const chooseArea = (zoneId: string | null): void => {
     setAreaOpen(false);
@@ -30,7 +45,22 @@ export default function NotificationsScreen(): React.ReactElement {
   return (
     <>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Card padded={false}>
+        <Card>
+          <View style={styles.switchRow}>
+            <MaterialIcons name="notifications-active" size={20} color={Colors.inkMuted} />
+            <Text style={styles.switchLabel}>{s('notifyAlerts')}</Text>
+            <Switch
+              value={settings.notifyAlerts}
+              onValueChange={(on) => void toggleNotifications(on)}
+              trackColor={{ true: Colors.brandBlue, false: Colors.line }}
+              thumbColor={Colors.white}
+              accessibilityLabel={s('notifyAlerts')}
+            />
+          </View>
+          <Text style={styles.switchDesc}>{s('notifyAlertsDesc')}</Text>
+        </Card>
+
+        <Card padded={false} style={styles.areaCard}>
           <NavRow
             icon="place"
             label={s('myArea')}
@@ -104,6 +134,10 @@ export default function NotificationsScreen(): React.ReactElement {
 
 const styles = StyleSheet.create({
   scroll: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
+  switchRow: { flexDirection: 'row', alignItems: 'center' },
+  switchLabel: { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.ink, marginLeft: 14 },
+  switchDesc: { fontSize: 12.5, lineHeight: 17.5, color: Colors.inkFaint, marginTop: Spacing.sm },
+  areaCard: { marginTop: Spacing.lg },
   radiusHeader: { flexDirection: 'row', alignItems: 'center' },
   radiusDesc: { flex: 1, fontSize: 12.5, lineHeight: 17.5, color: Colors.inkFaint, marginRight: Spacing.md },
   slider: { height: 40, marginTop: Spacing.sm },

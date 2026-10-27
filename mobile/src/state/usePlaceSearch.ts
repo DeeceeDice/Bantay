@@ -1,28 +1,26 @@
 import { useEffect, useState } from 'react';
 
 import { LatLng, latLng } from '../core/geo/latLng';
-import {
-  PlaceResult,
-  isGoogleMapsConfigured,
-  searchPlacesOnline,
-} from '../data/google/googleMaps';
+import { PlaceResult, isOnlineGeoAvailable, searchPlacesOnline } from '../data/geo/geoService';
 
-/** Wait this long after the last keystroke before asking Google. */
+/** Wait this long after the last keystroke before searching online. */
 const DEBOUNCE_MS = 350;
 const MIN_QUERY_LENGTH = 3;
 
 /**
- * Google place search for the map's search bar, debounced.
+ * Online place search (OpenStreetMap, through the `geo` function) for the
+ * map's search bar, debounced.
  *
- * Returns nothing (rather than an error) when there is no key, no
- * connection or no match, so the caller's offline gazetteer carries on alone.
+ * Returns nothing (rather than an error) when there is no connection, the
+ * service is busy or nothing matches, so the caller's offline gazetteer
+ * carries on alone.
  */
 export function usePlaceSearch(
   query: string,
   near: LatLng,
 ): { results: PlaceResult[]; searching: boolean } {
   const trimmed = query.trim();
-  const enabled = isGoogleMapsConfigured() && trimmed.length >= MIN_QUERY_LENGTH;
+  const enabled = isOnlineGeoAvailable() && trimmed.length >= MIN_QUERY_LENGTH;
   const [found, setFound] = useState<{ query: string; results: PlaceResult[] } | null>(null);
 
   // Rounded to about a kilometre so walking around does not re-run the search.

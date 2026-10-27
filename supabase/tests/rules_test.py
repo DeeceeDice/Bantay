@@ -96,6 +96,19 @@ check("...stored as pending, under the reporter's real name, in the right zone, 
       row == "pending|Ana|sampaloc|-", row)   # 60 m from Sampaloc centre, 280 m from UST
 check("...and the reporter's submitted count went up",
       admin(f"select reports_submitted from profiles where id = '{A}'") == "1")
+check("...with no photo, the list says so without sending one",
+      admin(f"select has_photo::text from reports where id = '{REP}'") == "false")
+PHOTO_REP = str(uuid.uuid4())
+expect_ok("a report filed with a photo",
+          f"""insert into reports (id, type, severity, lat, lng, reporter_id, photo_uri)
+              values ('{PHOTO_REP}', 'landslide', 'life_threatening', 14.6100, 120.9920, '{A}', 'data:image/jpeg;base64,AAAA');""", A)
+expect_ok("...is listed as having one, readable without the photo itself",
+          f"select has_photo::text from reports where id = '{PHOTO_REP}';", B, "true")
+expect_error("...and no client can claim a photo that is not there",
+             f"insert into reports (type, severity, lat, lng, reporter_id, has_photo) values ('other','not_passable',14.61,120.99,'{A}', true);",
+             A, "generated column")
+admin(f"delete from reports where id = '{PHOTO_REP}'")
+admin(f"update profiles set reports_submitted = 1 where id = '{A}'")
 expect_error("citizen cannot file a report as someone else",
              f"insert into reports (type, severity, lat, lng, reporter_id) values ('other','not_passable',14.61,120.99,'{B}');",
              A, "row-level security")
@@ -268,20 +281,25 @@ check("...and the audit entry says the zone was created", row == "1381300050|tru
 expect_ok("approving a barangay with a zone reuses it", f"select decide_access_request('{TREQ}', true);", S)
 check("...no second zone", admin("select count(*) from zones where psgc_code = '1381300022'") == "1")
 
-# --- free-tier guard for Google calls ---------------------------------------------
-expect_ok("a signed-in phone gets a ticket for a Google call",
-          "select claim_api_call('routes_compute')::text;", A, "true")
-expect_error("a signed-out client gets none", "select claim_api_call('routes_compute');", None,
+# --- free-tier guard: map search and routing ----------------------------------
+expect_ok("a signed-in phone gets a ticket for a map search",
+          "select claim_api_call('osm_search')::text;", A, "true")
+expect_ok("...and for a route", "select claim_api_call('osm_route')::text;", A, "true")
+expect_error("a signed-out client gets none", "select claim_api_call('osm_route');", None,
              "permission denied", role="anon")
 expect_ok("an unknown API gets none", "select claim_api_call('geocoding')::text;", A, "false")
-admin("update api_limits set monthly_limit = 2 where api = 'places_text_search';")
+for api in ("places_text_search", "routes_compute", "map_tiles_view"):
+    expect_ok(f"Google is off: older app builds get no ticket for {api}",
+              f"select claim_api_call('{api}')::text;", A, "false")
+admin("update api_limits set monthly_limit = 2 where api = 'osm_search';")
+admin("delete from api_usage where api = 'osm_search';")
 expect_ok("tickets stop at the monthly limit, for everyone together",
-          "select string_agg(claim_api_call('places_text_search')::text, ',') from generate_series(1, 3);",
+          "select string_agg(claim_api_call('osm_search')::text, ',') from generate_series(1, 3);",
           A, "true,true,false")
-expect_ok("...another account is refused too", "select claim_api_call('places_text_search')::text;", B, "false")
-expect_ok("usage is reported against the free allowance",
-          "select used || '/' || monthly_limit || '/' || free_per_month from api_usage_this_month() where api = 'places_text_search';",
-          A, "2/2/5000")
+expect_ok("...another account is refused too", "select claim_api_call('osm_search')::text;", B, "false")
+expect_ok("usage is reported against the allowance",
+          "select used || '/' || monthly_limit || '/' || free_per_month from api_usage_this_month() where api = 'osm_search';",
+          A, "2/2/30000")
 expect_error("clients cannot reset the counter", "delete from api_usage;", S, "permission denied")
 expect_error("clients cannot raise the limit", "update api_limits set monthly_limit = 99999;", S, "permission denied")
 

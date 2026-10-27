@@ -1,8 +1,13 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Tabs, router } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ColorValue, Platform, Text } from 'react-native';
 
+import {
+  notificationPermission,
+  onNotificationTap,
+  prepareNotifications,
+} from '../../src/core/platform/notifications';
 import { Colors } from '../../src/core/theme/colors';
 import { unreadCount } from '../../src/data/repositories/logic';
 import { useApp } from '../../src/state/appStore';
@@ -41,8 +46,17 @@ function TabLabel({ focused, color, children }: { focused: boolean; color: Color
  * the map keeps its camera position while a report is being filed.
  */
 export default function TabsLayout(): React.ReactElement {
-  const { s, data } = useApp();
+  const { s, data, settings } = useApp();
   const unread = unreadCount(data.alerts);
+
+  // Alert notifications: set up once signed in, and ask for permission on
+  // the phone. (A browser only lets a page ask in answer to a tap, so there
+  // the switch in Notification preferences asks.) Tapping one opens Alerts.
+  useEffect(() => {
+    if (!settings.notifyAlerts) return;
+    void prepareNotifications().then(() => notificationPermission(Platform.OS !== 'web'));
+  }, [settings.notifyAlerts]);
+  useEffect(() => onNotificationTap(() => router.navigate('/(tabs)/alerts')), []);
 
   return (
     <Tabs

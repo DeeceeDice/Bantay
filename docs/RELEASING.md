@@ -43,6 +43,24 @@ release**.
 
 ---
 
+## 3. Database changes and the `geo` function
+
+A push does not change the live database or its Edge Function; the
+**Database rules** workflow only tests the migrations against a scratch
+Postgres. When a push adds a file to `supabase/migrations/` or changes
+`supabase/functions/geo/`, apply it to the live project **before** the app
+that needs it is published (the APK and web workflows run on the same push):
+
+- **Migrations:** paste the new file into the dashboard's **SQL Editor**, or
+  let Supabase's GitHub integration apply it (mobile/docs/SUPABASE.md, step 10).
+  New migrations are written to be additive, so the copies of the app
+  already installed keep working.
+- **The function:** `supabase functions deploy geo`, or **Edge Functions ->
+  geo -> Deploy** in the dashboard with the new file. Check it with the body
+  `{"action":"health"}`.
+
+---
+
 ## Version numbers
 
 The app's version is `expo.version` in `mobile/app.json`; bump it by hand when

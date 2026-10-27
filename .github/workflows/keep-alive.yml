@@ -1,0 +1,49 @@
+# Keeps the shared Supabase database from pausing.
+#
+# A Free-plan Supabase project is paused after 7 days without requests, and
+# while it is paused nobody can sign in to Bantay or Bantay Admin. Every
+# second day this reads one row of the public barangay list through the same
+# API the apps use, with the same public anon key, which counts as activity.
+#
+# Free: a run takes a few seconds of the 2,000 free Actions minutes and reads
+# a few bytes. Run it by hand from the Actions tab to check the database is up.
+
+name: Keep database awake
+
+on:
+  schedule:
+    - cron: '17 3 */2 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Read one row from the database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: mobile/app.json
+          sparse-checkout-cone-mode: false
+
+      - name: Query the public API
+        run: |
+          set -euo pipefail
+          url=$(jq -r '.expo.extra.supabase.url' mobile/app.json)
+          key=$(jq -r '.expo.extra.supabase.anonKey' mobile/app.json)
+          for attempt in 1 2 3; do
+            status=$(curl -sS -o body.json -w '%{http_code}' \
+              -H "apikey: $key" -H "Authorization: Bearer $key" \
+              "$url/rest/v1/psgc_areas?select=code&limit=1") || status=000
+            if [ "$status" = 200 ] && jq -e 'length == 1' body.json > /dev/null; then
+              echo "Database answered: $(cat body.json)"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $status"
+            sleep 20
+          done
+          echo "::error::The database did not answer. If it is paused, restore it from the Supabase dashboard."
+          exit 1

@@ -55,7 +55,7 @@ function RoleIcon({ role, color }: { role: Choice; color: string }): React.React
  * offer here even by mistake.
  *
  * A barangay official names their barangay from the PSA's official list
- * (PSGC) - any of the country's 42,000 - and Google Places finds it on the
+ * (PSGC) - any of the country's 42,000 - and OpenStreetMap finds it on the
  * map. If Bantay has no zone there yet, approval creates one.
  */
 export default function RoleScreen(): React.ReactElement {

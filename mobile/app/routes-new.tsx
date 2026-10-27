@@ -5,7 +5,6 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { BantayMap, MapMarker, MapPolyline } from '../src/components/map/BantayMap';
 import { useMapController } from '../src/components/map/useMapController';
-import { MapTypeToggle, usePlacementTiles } from '../src/components/map/usePlacementTiles';
 import { Button } from '../src/components/ui';
 import { Field } from '../src/components/ui/AuthScaffold';
 import { PlacementPin } from '../src/components/ui/Pins';
@@ -13,10 +12,10 @@ import { Geo, LatLng } from '../src/core/geo/latLng';
 import { Colors, Spacing } from '../src/core/theme/colors';
 import {
   computeRoutes,
-  isGoogleMapsConfigured,
+  isOnlineGeoAvailable,
   pickSafestRoute,
   simplifyPath,
-} from '../src/data/google/googleMaps';
+} from '../src/data/geo/geoService';
 import { verifiedHazards } from '../src/data/repositories/logic';
 import { describePoint } from '../src/data/seed/gazetteer';
 import { useApp } from '../src/state/appStore';
@@ -26,15 +25,15 @@ import { useUserLocation } from '../src/state/LocationProvider';
  * Creates a saved route by tapping a start and an end point on the map.
  *
  * Save stays disabled until both ends are placed and the route has a name, so
- * a half-finished route can never end up in the list. With a Google Maps key
- * the route is snapped to real streets (the alternative passing the fewest
- * verified hazards), so its hazard badge measures the road actually taken.
+ * a half-finished route can never end up in the list. The route is snapped
+ * to real streets (the alternative passing the fewest verified hazards), so
+ * its hazard badge measures the road actually taken; offline, it falls back
+ * to the straight line between the two ends.
  */
 export default function NewRouteScreen(): React.ReactElement {
   const { s, data, addRoute } = useApp();
   const location = useUserLocation();
   const controller = useMapController({ center: location.current, zoom: 15 });
-  const tiles = usePlacementTiles();
 
   const [start, setStart] = useState<LatLng | null>(null);
   const [end, setEnd] = useState<LatLng | null>(null);
@@ -45,10 +44,10 @@ export default function NewRouteScreen(): React.ReactElement {
   const hazards = useMemo(() => verifiedHazards(data.reports), [data.reports]);
   const routeKey = start && end ? `${start.lat},${start.lng}:${end.lat},${end.lng}` : null;
   const streetPath = street && street.key === routeKey ? street.path : null;
-  const routing = isGoogleMapsConfigured() && routeKey !== null && street?.key !== routeKey;
+  const routing = isOnlineGeoAvailable() && routeKey !== null && street?.key !== routeKey;
 
   useEffect(() => {
-    if (!start || !end || !routeKey || !isGoogleMapsConfigured()) return;
+    if (!start || !end || !routeKey || !isOnlineGeoAvailable()) return;
     const abort = new AbortController();
     computeRoutes(start, end, 'DRIVE', hazards, abort.signal).then(
       (options) => {
@@ -154,16 +153,7 @@ export default function NewRouteScreen(): React.ReactElement {
           markers={markers}
           polylines={polylines}
           onPress={handleTap}
-          tileSource={tiles.source}
         />
-        {tiles.googleAvailable && (
-          <MapTypeToggle
-            value={tiles.mapType}
-            onChange={tiles.setMapType}
-            labels={{ roadmap: s('mapRoadmap'), satellite: s('mapSatellite') }}
-            style={styles.mapType}
-          />
-        )}
       </View>
 
       <View style={styles.footer}>
@@ -229,7 +219,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   mapWrap: { flex: 1 },
-  mapType: { position: 'absolute', top: 12, right: 14 },
   footer: {
     padding: Spacing.lg,
     borderTopWidth: 1,

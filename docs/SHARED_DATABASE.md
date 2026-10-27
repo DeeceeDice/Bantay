@@ -23,7 +23,10 @@ records the reviewer, alerts the reporter, updates both people's statistics
 and writes the audit log.
 
 [`supabase/tests/rules_test.py`](../supabase/tests/rules_test.py) checks all of
-it - 71 checks, each run as the role a real client would be - on every push.
+it - 106 checks, each run as the role a real client would be. The **Database
+rules** workflow runs them against a scratch Postgres built from the
+migrations whenever the migrations, the seed or the tests change; run them yourself with
+`supabase/tests/run.sh`.
 
 ## Accounts
 
@@ -157,7 +160,7 @@ Anyone may read it; only the loader writes it
   barangay zones carry theirs (Commonwealth `1381300022`, Sampaloc
   `1380606000`, ...).
 - An access request may carry `psgc_code` plus `center_lat` / `center_lng`,
-  the centre Bantay found for it with Google Places. If a zone already
+  the centre Bantay found for it on OpenStreetMap. If a zone already
   stands for that barangay, the request is filed against it (`zone_id` is
   set on insert). If not, `decide_access_request(id, true)` with no `zone`
   creates one - id `psgc-<code>`, named `Brgy. <name>`, a 900 m radius
@@ -196,11 +199,35 @@ pretend otherwise, and the console should not either:
 - **Service health, analytics exports and demo accounts.** The console
   simulates these. Analytics can be computed from `reports` and `audit_log`.
 
+## Reading reports without their photos
+
+A report's photo is a ~100 KB JPEG data URI inside `reports.photo_uri`, and
+Bantay Admin's safe-spot photos sit in `safe_spots.photo_url` the same way. A
+`select('*')` therefore downloads every photo on every read, which is what
+used up Supabase's free 5 GB of monthly egress.
+
+`reports.has_photo` (generated from `photo_uri`, never written by a client)
+says whether a report has a photo. Bantay lists reports with an explicit
+column list that leaves `photo_uri` out, fetches one report's photo only when
+someone opens it, and on a realtime event re-reads only the row it names. The
+console should do the same: name its columns, fetch `photo_uri` /
+`photo_url` for the one report or spot on screen, and on a realtime event
+re-read that row rather than everything.
+
+## The monthly API counter
+
+`claim_api_call(api)` hands out one ticket per external call, for every
+client together, from `api_limits`; `api_usage_this_month()` reports usage.
+The `geo` Edge Function (place search and routing for Bantay) claims
+`osm_search` and `osm_route`, 30,000 a month each. The Google rows
+(`places_text_search`, `routes_compute`, `map_tiles_view`) are 0: Bantay no
+longer uses Google, and older builds that still ask are refused.
+
 ## Connecting the console
 
-The console currently runs on in-memory mock data. To point it at this
-database it needs `@supabase/supabase-js`, the project URL and anon key from
-`mobile/app.json` (`expo.extra.supabase`), and its store's actions replaced by
-the operations above. Realtime is published for `reports`, `report_votes`,
-`alerts`, `safe_spots`, `access_requests`, `broadcasts` and `profiles`, so its
-queue, requests and users update live.
+Bantay Admin is connected: `src/data/remote/` in that repository reads and
+writes this database with the project URL and anon key, through the
+operations above, and keeps a demo mode that simulates them over its own
+store. Realtime is published for `reports`, `report_votes`, `alerts`,
+`safe_spots`, `access_requests`, `broadcasts` and `profiles`, so its queue,
+requests and users update live.

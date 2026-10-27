@@ -27,8 +27,14 @@ supabase/
     20260923120000_bantay_initial_schema.sql    tables, RLS, trigger, realtime
     20260927000000_admin_console.sql            what Bantay Admin shares
     20260928120000_psgc.sql                     the PSGC barangay list
+    20260928130000_psgc_search_accents.sql      accent-blind barangay search
+    20260928140000_free_tier_guard.sql          the monthly API counter
+    20261027000000_report_photo_flag.sql        has_photo, so lists skip photos
+    20261027000100_osm_geo_limits.sql           caps for map search and routing
+  functions/geo/index.ts                        Edge Function: search + routing
   scripts/psgc_to_sql.py                        loads PSGC from the PSA API
   seed.sql                                      sample spots and hazards
+  tests/run.sh                                  the rule tests (CI runs them)
 ```
 
 It sits at the repository root rather than inside `mobile/`, because the
@@ -73,9 +79,10 @@ is empty.
 3. Open `supabase/migrations/20260923120000_bantay_initial_schema.sql` from the
    repository root, copy **all** of it, paste it in.
 4. Click **Run** (or Ctrl/Cmd + Enter).
-5. Do the same with `supabase/migrations/20260927000000_admin_console.sql`,
-   then `20260928120000_psgc.sql` and `20260928130000_psgc_search_accents.sql`. Order matters: each
-   builds on the one before.
+5. Do the same with every other file in `supabase/migrations/`, in filename
+   order (the date at the front of each name): `20260927000000_admin_console.sql`,
+   the two `psgc` files, `20260928140000_free_tier_guard.sql`, then the two
+   `20261027` files. Order matters: each builds on the one before.
 
 You should see `Success. No rows returned` each time.
 
@@ -284,6 +291,24 @@ door. Email and password are the only way in. To add Google for real:
 
 ---
 
+## Step 8½ — Deploy the `geo` function (place search and routing)
+
+Search and street routing go through a small Edge Function,
+`supabase/functions/geo/index.ts`, which asks free OpenStreetMap services and
+caps their use with the monthly counter. Without it the app still works:
+search falls back to its built-in Manila places and directions say routing is
+unavailable.
+
+- **Dashboard:** **Edge Functions → Deploy a new function → Via editor**, name
+  it `geo`, paste the whole file, keep **Verify JWT** on, deploy.
+- **Or the CLI:** `supabase functions deploy geo` from the repository root.
+
+Check it: **Edge Functions → geo → Test** with the body `{"action":"health"}`
+(no sign-in needed). Each of `search`, `barangay`, `drive` and `walk` should
+say `"ok": true`.
+
+---
+
 ## Step 9 — Optional: move photos to Storage
 
 A report's photo already reaches every device: the app downscales it to an
@@ -292,8 +317,11 @@ A report's photo already reaches every device: the app downscales it to an
 their own phones with no extra setup. Reports filed before this held a path on
 the reporter's phone; those show "Photo unavailable" everywhere else.
 
-That keeps the project card-free, at the cost of every report row carrying
-its photo. If reports grow into the thousands, move photos to Storage:
+The app never downloads photos in bulk: it reads reports without
+`photo_uri` (the generated `has_photo` column says whether there is one) and
+fetches a photo only when someone opens that report. So the photos cost
+database space - about 4,500 of them fill the free 500 MB - but not the
+monthly egress. If reports grow into the thousands, move photos to Storage:
 
 1. Dashboard → **Storage → New bucket**, name it `hazard-photos`, mark it
    **Public**.
